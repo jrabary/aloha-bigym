@@ -1,7 +1,4 @@
 """An example of using BiGym with pixels for the ALOHA Robot."""
-import numpy as np
-import time
-
 from bigym.action_modes import AlohaPositionActionMode
 from bigym.envs.pick_and_place import StoreBox, PickBox
 from bigym.utils.observation_config import ObservationConfig, CameraConfig

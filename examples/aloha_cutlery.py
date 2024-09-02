@@ -1,7 +1,4 @@
 """An example of using BiGym with pixels for the ALOHA Robot."""
-import numpy as np
-import time
-
 from bigym.action_modes import AlohaPositionActionMode
 from bigym.envs.manipulation import FlipCutlery
 from bigym.utils.observation_config import ObservationConfig, CameraConfig
@@ -35,7 +32,6 @@ env.reset()
 for i in range(1000):
     obs, reward, terminated, truncated, info = env.step(action)
     env.render()
-    time.sleep(0.01)
     
     if terminated or truncated:
         env.reset()
