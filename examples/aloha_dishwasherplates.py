@@ -1,11 +1,11 @@
 """An example of using BiGym with pixels for the ALOHA Robot."""
 from bigym.action_modes import AlohaPositionActionMode
-from bigym.envs.manipulation import StackBlocks
+from bigym.envs.dishwasher_plates import DishwasherUnloadPlates, DishwasherLoadPlates, DishwasherUnloadPlatesLong
 from bigym.utils.observation_config import ObservationConfig, CameraConfig
 from bigym.robots.configs.aloha import AlohaRobot  
 
 print("Running 1000 steps with visualization...")
-env = StackBlocks(
+env = DishwasherUnloadPlatesLong(
     action_mode=AlohaPositionActionMode(floating_base=False, absolute=False, control_all_joints=True),
     observation_config=ObservationConfig(
         cameras=[
@@ -19,8 +19,6 @@ env = StackBlocks(
 )
 
 print("Initial robot position:", env.unwrapped._robot._body.get_position())
-print("Initial target position:")
-print(f"Target: {env.unwrapped.target.get_position()}")
 
 print("Observation Space:")
 print(env.observation_space)

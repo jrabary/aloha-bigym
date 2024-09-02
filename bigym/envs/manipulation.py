@@ -29,7 +29,7 @@ class _ManipulationEnv(BiGymEnv, ABC):
 class FlipCup(_ManipulationEnv):
     """Flip cup upside-up task."""
 
-    _CUP_POS = np.array([0, 0, 1])
+    _CUP_POS = np.array([0, 0, 0.9])
     _CUP_ROT_X = np.deg2rad(180)
     _CUP_ROT_Z = np.deg2rad(180)
     _CUP_STEP = 0.1

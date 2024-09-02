@@ -1,3 +1,75 @@
+# Aloha Bigym Modifications:
+
+This Fork of Bigym contains the bigym tasks modified to work with the [ALOHA](https://aloha-2.github.io/) bimanual system. ALOHA assets found [here](https://github.com/google-deepmind/mujoco_menagerie/tree/main/aloha).
+
+## Modified Tasks:
+
+[aloha_box.py](examples/aloha_box.py) contains `StoreBox` and `PickBox`
+<div>
+  <img width="20%" src="examples/images/491130E7-CEBC-4499-A6F8-0EBF80A7EC2A_1_201_a.jpeg" >
+</div>
+
+[aloha_cupboards.py](examples/aloha_cupboards.py) contains `WallCupboardOpen`, `WallCupboardClose`, `DrawerTopOpen`, `DrawerTopClose`, `DrawersAllOpen`, `DrawersAllClose`
+<div>
+  <img width="20%" src="examples/images/14B6FAEB-D88C-4271-8579-1DCC325F317C_1_201_a.jpeg" >
+</div>
+
+[aloha_dishwasher.py](examples/aloha_dishwasher.py) contains `DishwasherOpen`, `DishwasherClose`, `DishwasherOpenTrays`, `DishwasherCloseTrays`
+
+[aloha_dishwasher_cups.py](examples/aloha_dishwasher_cups.py) contains `DishwasherUnloadCups`, `DishwasherLoadCups`, `DishwasherUnloadCupsLong`
+<div>
+  <img width="20%" src="examples/images/3C23169B-D71D-4701-9FC6-3F5742DB1026_1_201_a.jpeg" >
+</div>
+
+[aloha_dishwasherplates.py](examples/aloha_dishwasherplates.py) contains `DishwasherUnloadPlates`, `DishwasherLoadPlates`, `DishwasherUnloadPlatesLong`
+<div>
+  <img width="20%" src="examples/images/B3590652-E684-4B08-81FE-99558B864777_1_201_a.jpeg" >
+</div>
+
+[aloha_dishwashercutlery.py](examples/aloha_dishwashercutlery.py) contains `DishwasherUnloadCutlery`, `DishwasherLoadCutlery`, `DishwasherUnloadCutleryLong`
+
+[aloha_dualreachtar.py](examples/aloha_dualreachtar.py) contains `ReachTargetDual`, `ReachTarget`, `ReachTargetSingle`
+<div>
+  <img width="20%" src="examples/images/12E4435B-2096-4F53-A950-94B48E462618_1_201_a.jpeg" >
+</div>
+
+[aloha_flip.py](examples/aloha_flip.py) contains `FlipCup`, `FlipCutlery`
+
+[aloha_groceries.py](examples/aloha_groceries.py) contains `GroceriesStore`
+<div>
+  <img width="20%" src="examples/images/Screenshot 2024-09-01 at 10.53.42 PM.png" >
+</div>
+
+[aloha_moveplates.py](examples/aloha_moveplates.py) contains `MovePlate`, `MoveTwoPlates`
+
+[aloha_saucepan.py](examples/aloha_saucepan.py) contains `FlipSandwich`, `ToastSandwich`, `SaucepanToHob`, `RemoveSandwich`
+<div>
+  <img width="20%" src="examples/images/2F26601D-258E-4A11-8293-E68A19A8B732_1_201_a.jpeg" >
+</div>
+
+[aloha_stackblocks.py](examples/aloha_stackblocks.py) contains `StackBlocks` 
+<div>
+  <img width="20%" src="examples/images/99002BF3-BFFC-43CA-99C6-0D6AE7983F0F_1_201_a.jpeg" >
+</div>
+
+[aloha_storekitchenware.py](examples/aloha_storekitchenware.py) contains `StoreKitchenware`
+
+[aloha_takecups.py](examples/aloha_takecups.py) contains `TakeCups`, `PutCups`
+
+<div>
+  <img width="20%" src="examples/images/Screenshot 2024-09-01 at 10.56.47 PM.png" >
+</div>
+
+No longer relevant: `PickBox`, `GroceriesStoreLower`, `CupboardsOpenAll`, `CupboardsCloseAll`
+
+# Install
+
+```bash
+pip install -e .
+```
+
+# Original Bigym README:
+
 <h1>
   <a href="#"><img alt="BiGym" src="doc/images/bigym.png" width="100%"></a>
 </h1>

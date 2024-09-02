@@ -1,23 +1,23 @@
 # 3 base and 1 wall cabinets
 props:
   - type: BaseCabinet
-    position: [1.2, 0, 0]
-    euler: [ 0, 0, -90 ]
+    position: [-0.31, 1, 0.8]
+    euler: [ 0, 0, 0 ]
     big_drawers_enable: [true, false]
     small_drawers_enable: [false, false, true, true]
     hob_enable: true
-  - type: BaseCabinet
-    position: [ 1.2, -0.6, 0 ]
-    euler: [ 0, 0, -90 ]
-    door_left_enable: true
-    shelf_enable: true
-  - type: BaseCabinet
-    position: [ 1.2, 0.6, 0 ]
-    euler: [ 0, 0, -90 ]
-    door_right_enable: true
-    shelf_enable: true
+  # - type: BaseCabinet
+  #   position: [ 1.2, -0.6, 0 ]
+  #   euler: [ 0, 0, -90 ]
+  #   door_left_enable: true
+  #   shelf_enable: true
+  # - type: BaseCabinet
+  #   position: [ 1.2, 0.6, 0 ]
+  #   euler: [ 0, 0, -90 ]
+  #   door_right_enable: true
+  #   shelf_enable: true
   - type: WallCabinet
-    position: [ 1.2, 0, 0 ]
-    euler: [ 0, 0, -90 ]
+    position: [ 0.31, 0.8, -0.62]
+    euler: [ 0, 0, 0 ]
     doors_enable: true
     vent_enable: true

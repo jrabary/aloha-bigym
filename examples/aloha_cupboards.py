@@ -3,12 +3,12 @@ import numpy as np
 import time
 
 from bigym.action_modes import AlohaPositionActionMode
-from bigym.envs.manipulation import FlipCup
+from bigym.envs.cupboards import WallCupboardOpen, WallCupboardClose, DrawerTopOpen, DrawerTopClose, DrawersAllOpen, DrawersAllClose
 from bigym.utils.observation_config import ObservationConfig, CameraConfig
-from bigym.robots.configs.aloha import AlohaRobot  # Import the AlohaRobot class
+from bigym.robots.configs.aloha import AlohaRobot  
 
 print("Running 1000 steps with visualization...")
-env = FlipCup(
+env = DrawersAllClose(
     action_mode=AlohaPositionActionMode(floating_base=False, absolute=False, control_all_joints=True),
     observation_config=ObservationConfig(
         cameras=[
@@ -33,16 +33,8 @@ print(f"action: {action}")
 
 env.reset()
 for i in range(1000):
-    # Create an action array for just the gripper positions
-    
     obs, reward, terminated, truncated, info = env.step(action)
-    
-    print("Current joint positions:", env.unwrapped._robot._body.get_position())
-
-    # Render the current state
     env.render()
-    
-    # Add a small delay to make the visualization more visible (optional)
     time.sleep(0.01)
     
     if terminated or truncated:

@@ -3,8 +3,8 @@ include:
   - counter_dishwasher.yaml
 props:
   - type: BaseCabinet
-    position: [1, -1.2, 0]
-    euler: [0, 0, -90]
+    position: [0.8, 1, 0.7]
+    euler: [0, 0, 0]
     small_drawers_enable: [true, true, true, true]
     children:
     - type: CutleryTray

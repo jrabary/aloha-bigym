@@ -11,6 +11,7 @@ from bigym.utils.observation_config import ObservationConfig, CameraConfig
 from demonstrations.demo_player import DemoPlayer
 from demonstrations.demo_store import DemoStore
 from demonstrations.utils import Metadata
+from bigym.robots.configs.google_robot import GoogleRobot
 
 control_frequency = 50
 env = ReachTarget(
@@ -18,12 +19,12 @@ env = ReachTarget(
     control_frequency=50,
     observation_config=ObservationConfig(
         cameras=[
-            CameraConfig("head", resolution=(84, 84)),
-            CameraConfig("left_wrist", resolution=(84, 84)),
-            CameraConfig("right_wrist", resolution=(84, 84)),
+            # CameraConfig("head", resolution=(84, 84)),
+            # CameraConfig("wrist", resolution=(84, 84)),  # Only one wrist camera
         ]
     ),
     render_mode="human",
+    robot_cls=GoogleRobot  # Add this line to use the GoogleRobot
 )
 metadata = Metadata.from_env(env)
 

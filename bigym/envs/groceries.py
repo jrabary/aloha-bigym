@@ -12,7 +12,7 @@ from bigym.utils.env_utils import get_random_points_on_plane
 
 
 class GroceriesStoreLower(BiGymEnv):
-    """Put groceries to lower cabinets tasks."""
+    """Used for GroceriesStore"""
 
     # _PRESET_PATH = PRESETS_PATH / "counter_base_2.yaml"
 
@@ -63,16 +63,16 @@ class GroceriesStoreLower(BiGymEnv):
             for side in self.robot.grippers:
                 if self.robot.is_gripper_holding_object(prop, side):
                     return False
-            if not (
-                prop.is_colliding(self.cabinet_1.shelf)
-                or prop.is_colliding(self.cabinet_1.shelf_bottom)
-                or prop.is_colliding(self.cabinet_2.shelf_bottom)
-            ):
+            # if not (
+            #     prop.is_colliding(self.cabinet_1.shelf)
+            #     or prop.is_colliding(self.cabinet_1.shelf_bottom)
+            #     or prop.is_colliding(self.cabinet_2.shelf_bottom)
+            # ):
                 return False
         return True
 
 
-class GroceriesStoreUpper(GroceriesStoreLower):
+class GroceriesStore(GroceriesStoreLower):
     """Put groceries to upper cabinets tasks."""
 
     _PRESET_PATH = PRESETS_PATH / "counter_base_wall_2x2.yaml"

@@ -21,7 +21,7 @@ class PutCups(BiGymEnv):
 
     _CUPS_COUNT = 2
 
-    _CUPS_POS = np.array([0.8, 0, 1])
+    _CUPS_POS = np.array([0, 0, 0.8])
     _CUPS_ROT = np.deg2rad(180)
     _CUPS_STEP = 0.15
     _CUPS_POS_EXTENTS = np.array([0.1, 0.25])
@@ -61,7 +61,7 @@ class PutCups(BiGymEnv):
 class TakeCups(PutCups):
     """Take cups from the wall cupboard."""
 
-    _CUPS_POS = np.array([1.05, 0, 1.5])
+    _CUPS_POS = np.array([0, 0.8, 1.5])
 
     def _success(self) -> bool:
         for cup in self.cups:
@@ -78,7 +78,7 @@ class StoreBox(BiGymEnv):
 
     _PRESET_PATH = PRESETS_PATH / "cabinet_door.yaml"
 
-    _BOX_POS = np.array([0.8, 0, 1])
+    _BOX_POS = np.array([0, 0, 0.8])
     _BOX_POS_BOUNDS = np.array([0.03, 0.03, 0])
     _BOX_ROT_BOUNDS = np.deg2rad(180)
 
@@ -88,7 +88,7 @@ class StoreBox(BiGymEnv):
 
     def _on_reset(self):
         offset = np.random.uniform(-self._BOX_POS_BOUNDS, self._BOX_POS_BOUNDS)
-        self.box.body.set_position(self._BOX_POS + offset, True)
+        self.box.body.set_position(self._BOX_POS + offset)
         angle = np.random.uniform(-self._BOX_ROT_BOUNDS, self._BOX_ROT_BOUNDS)
         self.box.body.set_quaternion(Quaternion(axis=[0, 0, 1], angle=angle).elements)
 
@@ -117,7 +117,7 @@ class PickBox(StoreBox):
 
     def _on_reset(self):
         offset = np.random.uniform(-self._BOX_POS_BOUNDS, self._BOX_POS_BOUNDS)
-        self.box.body.set_position(self._BOX_POS + offset, True)
+        self.box.body.set_position(self._BOX_POS + offset)
         angle = np.random.uniform(-self._BOX_ROT_BOUNDS, self._BOX_ROT_BOUNDS)
         quat = self._BOX_QUAT
         quat *= Quaternion(axis=[1, 0, 0], angle=angle)
@@ -129,7 +129,7 @@ class SaucepanToHob(BiGymEnv):
 
     _PRESET_PATH = PRESETS_PATH / "cabinet_hob.yaml"
 
-    _SAUCEPAN_POS = np.array([0.85, 0.1, 0.5])
+    _SAUCEPAN_POS = np.array([0, 0, 0.8])
     _SAUCEPAN_QUAT = Quaternion(axis=[0, 0, 1], degrees=90)
     _SAUCEPAN_POS_BOUNDS = np.array([0.05, 0.05, 0])
     _SAUCEPAN_ROT_BOUNDS = np.deg2rad([0, 0, 20])
@@ -204,7 +204,7 @@ class ToastSandwich(BiGymEnv):
     _SPATULA_OFFSET = np.array([-0.02, 0.02, 0.08])
     _SPATULA_QUAT = Quaternion(axis=[0, 0, 1], degrees=90)
 
-    _BOARD_POS = np.array([0.7, -0.6, 0.88])
+    _BOARD_POS = np.array([0, 0, 0.8])
     _BOARD_ROT_BOUNDS = np.deg2rad([0, 0, 5])
 
     _TOLERANCE = np.deg2rad(10)

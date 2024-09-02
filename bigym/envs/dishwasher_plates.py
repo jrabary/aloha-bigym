@@ -21,14 +21,14 @@ class _DishwasherPlatesEnv(BiGymEnv, ABC):
 
     _PRESET_PATH = PRESETS_PATH / "counter_dishwasher.yaml"
 
-    _RACK_POSITION = np.array([0.6, -0.6, 0.86])
+    _RACK_POSITION = np.array([0, -0.2, 0.77])
     _RACK_BOUNDS = np.array([0.05, 0.05, 0])
 
     _PLATES_COUNT = 2
     _PLATE_ROTATION = quaternion.from_euler_angles(np.pi / 2, np.pi / 2, 0)
-    _PLATE_OFFSET_POS = np.array([0, -0.01, 0.05])
+    _PLATE_OFFSET_POS = np.array([0, -0.02, 0.0])
 
-    _SITES_STEP = 2
+    _SITES_STEP = 4
     _SITES_SLICE = 4
 
     _TOLERANCE = np.deg2rad(20)
@@ -57,6 +57,9 @@ class _DishwasherPlatesEnv(BiGymEnv, ABC):
 class DishwasherUnloadPlates(_DishwasherPlatesEnv):
     """Unload plates from dishwasher task."""
 
+    _PLATE_ROTATION = quaternion.from_euler_angles(0, np.pi / 2, 0)
+    _PLATE_OFFSET_POS = np.array([0, 0, 0.11])
+
     def _success(self) -> bool:
         for plate in self.plates:
             if not plate.is_colliding(self.drainer):
@@ -83,7 +86,7 @@ class DishwasherUnloadPlatesLong(DishwasherUnloadPlates):
     _PRESET_PATH = PRESETS_PATH / "counter_dishwasher_wall_cabinet.yaml"
 
     _PLATES_COUNT = 1
-    _RACK_POSITION = np.array([0.8, -0.6, 1.474])
+    _RACK_POSITION = np.array([0.65, 0.6, 0.8])
     _RACK_BOUNDS = np.array([0.01, 0.05, 0])
 
     _TOLERANCE = 0.1

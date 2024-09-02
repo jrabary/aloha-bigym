@@ -20,13 +20,10 @@ class _CupboardsInteractionEnv(BiGymEnv, ABC):
 
     def _initialize_env(self):
         self.cabinet_drawers = self._preset.get_props(BaseCabinet)[0]
-        self.cabinet_door_left = self._preset.get_props(BaseCabinet)[1]
-        self.cabinet_door_right = self._preset.get_props(BaseCabinet)[2]
+        
         self.cabinet_wall = self._preset.get_props(WallCabinet)[0]
         self.all_cabinets = [
             self.cabinet_drawers,
-            self.cabinet_door_left,
-            self.cabinet_door_right,
             self.cabinet_wall,
         ]
 
@@ -80,27 +77,3 @@ class WallCupboardClose(_CupboardsInteractionEnv):
 
     def _on_reset(self):
         self.cabinet_wall.set_state(np.array([1, 1]))
-
-
-class CupboardsOpenAll(_CupboardsInteractionEnv):
-    """Open all doors/drawers of the kitchen counter task."""
-
-    def _success(self) -> bool:
-        for cabinet in self.all_cabinets:
-            if not np.allclose(cabinet.get_state(), 1, atol=TOLERANCE):
-                return False
-        return True
-
-
-class CupboardsCloseAll(_CupboardsInteractionEnv):
-    """Close all doors/drawers of the kitchen counter task."""
-
-    def _success(self) -> bool:
-        for cabinet in self.all_cabinets:
-            if not np.allclose(cabinet.get_state(), 0, atol=TOLERANCE):
-                return False
-        return True
-
-    def _on_reset(self):
-        for cabinet in self.all_cabinets:
-            cabinet.set_state(np.ones_like(cabinet.get_state()))

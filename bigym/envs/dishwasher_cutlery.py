@@ -7,7 +7,7 @@ from pyquaternion import Quaternion
 from bigym.bigym_env import BiGymEnv
 from bigym.const import PRESETS_PATH
 from bigym.envs.props.cabintets import BaseCabinet
-from bigym.envs.props.cutlery import Fork, Knife
+from bigym.envs.props.cutlery import Fork, Knife, Spoon, Spatula
 from bigym.envs.props.dishwasher import Dishwasher
 from bigym.envs.props.holders import CutleryTray
 from bigym.envs.props.kitchenware import Mug
@@ -62,14 +62,14 @@ class _DishwasherUnloadCutleryEnv(_DishwasherCutleryEnv):
             item_quat = self._CUTLERY_SPAWN_ROT * Quaternion(
                 axis=[0, 1, 0], angle=angle
             )
-            item.body.set_quaternion(item_quat.elements, True)
-            item.body.set_position(item_pos, True)
+            item.body.set_quaternion(item_quat.elements)
+            item.body.set_position(item_pos)
 
 
 class DishwasherUnloadCutlery(_DishwasherUnloadCutleryEnv):
     """Unload cutlery from dishwasher task."""
 
-    _TRAY_POS = np.array([0.65, -0.6, 0.86])
+    _TRAY_POS = np.array([0, 0, 0.77])
     _TRAY_BOUNDS = np.array([0.05, 0.05, 0])
     _TRAY_ROT = np.array([0, 0, -np.pi / 2])
 
@@ -122,7 +122,7 @@ class DishwasherUnloadCutleryLong(_DishwasherUnloadCutleryEnv):
 class DishwasherLoadCutlery(_DishwasherCutleryEnv):
     """Load cutlery to dishwasher task."""
 
-    _MUG_POS = np.array([0.65, -0.6, 0.86])
+    _MUG_POS = np.array([0, 0, 0.77])
     _MUG_BOUNDS = np.array([0.05, 0.05, 0])
     _MUG_BOUNDS_ANGLE = np.deg2rad(90)
 
@@ -151,9 +151,9 @@ class DishwasherLoadCutlery(_DishwasherCutleryEnv):
         self.mug.body.set_euler(np.array([0, 0, mug_angle]))
         offset = np.random.uniform(-self._MUG_BOUNDS, self._MUG_BOUNDS)
         mug_pos = self._MUG_POS + offset
-        self.mug.body.set_position(mug_pos, True)
+        self.mug.body.set_position(mug_pos)
         for i, item in enumerate(self.cutlery):
-            item.body.set_quaternion(self._CUTLERY_SPAWN_ROT.elements, True)
+            item.body.set_quaternion(self._CUTLERY_SPAWN_ROT.elements)
             offset_angle = self._CUTLERY_OFFSET_ANGLE * i
             offset_angle += np.random.uniform(
                 -self._CUTLERY_OFFSET_ANGLE_RANGE, self._CUTLERY_OFFSET_ANGLE_RANGE
@@ -161,4 +161,4 @@ class DishwasherLoadCutlery(_DishwasherCutleryEnv):
             item_offset = np.array([np.cos(offset_angle), np.sin(offset_angle), 0])
             item_offset *= self._CUTLERY_SPAWN_OFFSET
             item_pos = mug_pos.copy() + self._BASKET_OFFSET_POS + item_offset
-            item.body.set_position(item_pos, True)
+            item.body.set_position(item_pos)

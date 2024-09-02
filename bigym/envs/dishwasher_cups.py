@@ -68,10 +68,10 @@ class DishwasherUnloadCups(_DishwasherCupsEnv):
             quat = Quaternion(axis=[1, 0, 0], angle=self._CUPS_ROT_X)
             angle = np.random.uniform(-self._CUPS_ROT_BOUNDS, self._CUPS_ROT_BOUNDS)
             quat *= Quaternion(axis=[0, 0, 1], angle=self._CUPS_ROT_Z + angle)
-            cup.body.set_quaternion(quat.elements, True)
+            cup.body.set_quaternion(quat.elements)
             pos = site.get_position()
             pos += self._CUPS_POS
-            cup.body.set_position(pos, True)
+            cup.body.set_position(pos)
 
 
 class DishwasherUnloadCupsLong(DishwasherUnloadCups):
@@ -103,7 +103,7 @@ class DishwasherUnloadCupsLong(DishwasherUnloadCups):
 class DishwasherLoadCups(_DishwasherCupsEnv):
     """Load cups to dishwasher task."""
 
-    _CUPS_POS = np.array([0.6, -0.6, 1])
+    _CUPS_POS = np.array([0, -0.2, 0.85])
     _CUPS_POS_STEP = np.array([0, 0.15, 0])
     _CUPS_POS_BOUNDS = np.array([0.05, 0.02, 0])
     _CUPS_ROT_X = np.deg2rad(180)
@@ -125,7 +125,7 @@ class DishwasherLoadCups(_DishwasherCupsEnv):
             quat = Quaternion(axis=[1, 0, 0], angle=self._CUPS_ROT_X)
             angle = np.random.uniform(-self._CUPS_ROT_BOUNDS, self._CUPS_ROT_BOUNDS)
             quat *= Quaternion(axis=[0, 0, 1], angle=self._CUPS_ROT_Z + angle)
-            cup.body.set_quaternion(quat.elements, True)
+            cup.body.set_quaternion(quat.elements)
             pos = self._CUPS_POS + i * self._CUPS_POS_STEP
             pos += np.random.uniform(-self._CUPS_POS_BOUNDS, self._CUPS_POS_BOUNDS)
-            cup.body.set_position(pos, True)
+            cup.body.set_position(pos)
