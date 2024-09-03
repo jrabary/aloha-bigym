@@ -74,6 +74,8 @@ pip install .
 `from mojo.elements.element import MujocoElement` 
 to `.venv/lib/python3.12/site-packages/gymnasium/envs/mujoco/mujoco_rendering.py`
 
+To run the simulated aloha bigym tasks navigate to [examples](examples) and run any of the `aloha_<task>.py` files.
+
 # Original Bigym README:
 
 <h1>
