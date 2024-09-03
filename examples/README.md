@@ -57,3 +57,17 @@
 </div>
 
 No longer relevant: `PickBox`, `GroceriesStoreLower`, `CupboardsOpenAll`, `CupboardsCloseAll`
+
+
+# Common Errors
+
+If this error is encountered: 
+
+```
+from mojo.elements import Body, Site, MujocoElement
+ImportError: cannot import name 'MujocoElement' from 'mojo.elements'
+```
+
+Add this line to `site-packages/mojo/elements/__init__.py` in your python directory:
+
+`from mojo.elements.element import MujocoElement`

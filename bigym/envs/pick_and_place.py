@@ -102,9 +102,9 @@ class StoreBox(BiGymEnv):
 
 
 class PickBox(StoreBox):
-    """Pick up box from and place it on the counter task."""
+    """Pick up box originally positioned vertically"""
 
-    _BOX_POS = np.array([0.8, -1, 0.2])
+    _BOX_POS = np.array([0, 0, 0.9])
     _BOX_QUAT = Quaternion(axis=[0, 1, 0], degrees=90)
 
     def _success(self) -> bool:
