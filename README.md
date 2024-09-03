@@ -65,8 +65,14 @@ No longer relevant: `PickBox`, `GroceriesStoreLower`, `CupboardsOpenAll`, `Cupbo
 # Install
 
 ```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
 pip install .
 ```
+
+- If you encounter this error: `ImportError: cannot import name 'MujocoElement' from 'mojo.elements'`, add this line: 
+`from mojo.elements.element import MujocoElement` 
+to `.venv/lib/python3.12/site-packages/gymnasium/envs/mujoco/mujoco_rendering.py`
 
 # Original Bigym README:
 
