@@ -65,7 +65,7 @@ No longer relevant: `PickBox`, `GroceriesStoreLower`, `CupboardsOpenAll`, `Cupbo
 # Install
 
 ```bash
-pip install -e .
+pip install .
 ```
 
 # Original Bigym README:
