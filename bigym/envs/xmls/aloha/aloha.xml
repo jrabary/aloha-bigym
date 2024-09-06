@@ -70,19 +70,19 @@
       <body name="left_shoulder_link" pos="0 0 0.079">
         <inertial pos="0.000259233 -3.3552e-06 0.0116129" quat="-0.476119 0.476083 0.52279 0.522826" mass="0.798614"
           diaginertia="0.00120156 0.00113744 0.0009388"/>
-        <joint name="left_waist" class="waist"/>
+        <joint name="left_waist" class="waist" pos="-0.7"/>
         <geom pos="0 0 -0.003" quat="1 0 0 1" class="visual" mesh="vx300s_2_shoulder"/>
         <geom pos="0 0 -0.003" quat="1 0 0 1" mesh="vx300s_2_shoulder" class="collision"/>
         <body name="left_upper_arm_link" pos="0 0 0.04805">
           <inertial pos="0.0206949 4e-10 0.226459" quat="0 0.0728458 0 0.997343" mass="0.792592"
             diaginertia="0.00911338 0.008925 0.000759317"/>
-          <joint name="left_shoulder" class="shoulder"/>
+          <joint name="left_shoulder" class="shoulder" pos="1"/>
           <geom quat="1 0 0 1" class="visual" mesh="vx300s_3_upper_arm"/>
           <geom quat="1 0 0 1" class="collision" mesh="vx300s_3_upper_arm"/>
           <body name="left_upper_forearm_link" pos="0.05955 0 0.3">
             <inertial pos="0.105723 0 0" quat="-0.000621631 0.704724 0.0105292 0.709403" mass="0.322228"
               diaginertia="0.00144107 0.00134228 0.000152047"/>
-            <joint name="left_elbow" class="elbow"/>
+            <joint name="left_elbow" class="elbow" pos="1"/>
             <geom class="visual" mesh="vx300s_4_upper_forearm"/>
             <geom class="collision" mesh="vx300s_4_upper_forearm"/>
             <body name="left_lower_forearm_link" pos="0.2 0 0">
@@ -120,19 +120,19 @@
       <body name="right_shoulder_link" pos="0 0 0.079">
         <inertial pos="0.000259233 -3.3552e-06 0.0116129" quat="-0.476119 0.476083 0.52279 0.522826" mass="0.798614"
           diaginertia="0.00120156 0.00113744 0.0009388"/>
-        <joint name="right_waist" class="waist"/>
+        <joint name="right_waist" class="waist" pos="-0.7"/>
         <geom pos="0 0 -0.003" quat="1 0 0 1" class="visual" mesh="vx300s_2_shoulder"/>
         <geom pos="0 0 -0.003" quat="1 0 0 1" mesh="vx300s_2_shoulder" class="collision"/>
         <body name="right_upper_arm_link" pos="0 0 0.04805">
           <inertial pos="0.0206949 4e-10 0.226459" quat="0 0.0728458 0 0.997343" mass="0.792592"
             diaginertia="0.00911338 0.008925 0.000759317"/>
-          <joint name="right_shoulder" class="shoulder"/>
+          <joint name="right_shoulder" class="shoulder" pos="-0.7"/>
           <geom quat="1 0 0 1" class="visual" mesh="vx300s_3_upper_arm"/>
           <geom quat="1 0 0 1" class="collision" mesh="vx300s_3_upper_arm"/>
           <body name="right_upper_forearm_link" pos="0.05955 0 0.3">
             <inertial pos="0.105723 0 0" quat="-0.000621631 0.704724 0.0105292 0.709403" mass="0.322228"
               diaginertia="0.00144107 0.00134228 0.000152047"/>
-            <joint name="right_elbow" class="elbow"/>
+            <joint name="right_elbow" class="elbow" pos="-0.7"/>
             <geom class="visual" mesh="vx300s_4_upper_forearm"/>
             <geom class="collision" mesh="vx300s_4_upper_forearm"/>
             <body name="right_lower_forearm_link" pos="0.2 0 0">

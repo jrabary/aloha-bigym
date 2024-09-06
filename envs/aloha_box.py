@@ -3,6 +3,7 @@ from bigym.action_modes import AlohaPositionActionMode
 from bigym.envs.pick_and_place import StoreBox, PickBox
 from bigym.utils.observation_config import ObservationConfig, CameraConfig
 from bigym.robots.configs.aloha import AlohaRobot  
+import numpy as np
 
 
 print("Running 1000 steps with visualization...")
@@ -19,8 +20,6 @@ env = PickBox(
     robot_cls=AlohaRobot
 )
 
-print("Initial robot position:", env.unwrapped._robot._body.get_position())
-
 print("Observation Space:")
 print(env.observation_space)
 print("Action Space:")
@@ -29,10 +28,20 @@ print(env.action_space)
 action = env.action_space.sample()
 print(f"action: {action}")
 
+action = (np.ones_like(action) / 10 ) - 0.01
+action[-1] = 0.01
+action[-2] = 0.01
+print(f"action: {action}")
+
+print("Initial joint position:", env.unwrapped._robot.qpos)
+
 env.reset()
 for i in range(1000):
     obs, reward, terminated, truncated, info = env.step(action)
     env.render()
+
+    if i < 2 or i % 200 == 0:
+        print("iteration ", i, " joint position:", env.unwrapped._robot.qpos)
     
     if terminated or truncated:
         env.reset()

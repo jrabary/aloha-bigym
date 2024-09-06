@@ -157,13 +157,13 @@
         <body name="left_upper_arm_link" pos="0 0 0.04805">
           <inertial pos="0.0206949 4e-10 0.226459" quat="0 0.0728458 0 0.997343" mass="0.792592"
             diaginertia="0.00911338 0.008925 0.000759317"/>
-          <joint name="left_shoulder" class="shoulder"/>
+          <joint name="left_shoulder" class="shoulder" />
           <geom quat="1 0 0 1" class="visual" mesh="vx300s_3_upper_arm"/>
           <geom quat="1 0 0 1" class="collision" mesh="vx300s_3_upper_arm"/>
           <body name="left_upper_forearm_link" pos="0.05955 0 0.3">
             <inertial pos="0.105723 0 0" quat="-0.000621631 0.704724 0.0105292 0.709403" mass="0.322228"
               diaginertia="0.00144107 0.00134228 0.000152047"/>
-            <joint name="left_elbow" class="elbow"/>
+            <joint name="left_elbow" class="elbow" ref="-1.7"/>
             <geom class="visual" mesh="vx300s_4_upper_forearm"/>
             <geom class="collision" mesh="vx300s_4_upper_forearm"/>
             <body name="left_lower_forearm_link" pos="0.2 0 0">
@@ -175,7 +175,7 @@
               <body name="left_wrist_link" pos="0.1 0 0">
                 <inertial pos="0.046743 -7.6652e-06 0.010565" quat="-0.00100191 0.544586 0.0026583 0.8387"
                   mass="0.115395" diaginertia="5.45707e-05 4.63101e-05 4.32692e-05"/>
-                <joint name="left_wrist_angle" class="wrist_angle"/>
+                <joint name="left_wrist_angle" class="wrist_angle" ref="-1.7"/>
                 <geom quat="1 0 0 1" class="visual" mesh="vx300s_6_wrist"/>
                 <geom quat="1 0 0 1" class="collision" mesh="vx300s_6_wrist"/>
                 <body name="left_gripper_link" pos="0.069744 0 0">
@@ -207,13 +207,13 @@
         <body name="right_upper_arm_link" pos="0 0 0.04805">
           <inertial pos="0.0206949 4e-10 0.226459" quat="0 0.0728458 0 0.997343" mass="0.792592"
             diaginertia="0.00911338 0.008925 0.000759317"/>
-          <joint name="right_shoulder" class="shoulder"/>
+          <joint name="right_shoulder" class="shoulder" ref="-1.7"/>
           <geom quat="1 0 0 1" class="visual" mesh="vx300s_3_upper_arm"/>
           <geom quat="1 0 0 1" class="collision" mesh="vx300s_3_upper_arm"/>
           <body name="right_upper_forearm_link" pos="0.05955 0 0.3">
             <inertial pos="0.105723 0 0" quat="-0.000621631 0.704724 0.0105292 0.709403" mass="0.322228"
               diaginertia="0.00144107 0.00134228 0.000152047"/>
-            <joint name="right_elbow" class="elbow"/>
+            <joint name="right_elbow" class="elbow"  ref="-1.7"/>
             <geom class="visual" mesh="vx300s_4_upper_forearm"/>
             <geom class="collision" mesh="vx300s_4_upper_forearm"/>
             <body name="right_lower_forearm_link" pos="0.2 0 0">
@@ -225,7 +225,7 @@
               <body name="right_wrist_link" pos="0.1 0 0">
                 <inertial pos="0.046743 -7.6652e-06 0.010565" quat="-0.00100191 0.544586 0.0026583 0.8387"
                   mass="0.115395" diaginertia="5.45707e-05 4.63101e-05 4.32692e-05"/>
-                <joint name="right_wrist_angle" class="wrist_angle"/>
+                <joint name="right_wrist_angle" class="wrist_angle" ref="-1.7"/>
                 <geom quat="1 0 0 1" class="visual" mesh="vx300s_6_wrist"/>
                 <geom quat="1 0 0 1" class="collision" mesh="vx300s_6_wrist"/>
                 <body name="right_gripper_link" pos="0.069744 0 0">
@@ -244,8 +244,8 @@
     </body>
   </worldbody>
   <contact>
-  <exclude body1="left_base_link" body2="left_shoulder_link"/>
-  <exclude body1="right_base_link" body2="right_shoulder_link"/>
+  <!-- <exclude body1="left_base_link" body2="left_shoulder_link"/>
+  <exclude body1="right_base_link" body2="right_shoulder_link"/> -->
   </contact>
   <actuator>
     <position name="left_waist" joint="left_waist" ctrlrange="-3.14158 3.14158" kp="43"/>
