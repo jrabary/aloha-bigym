@@ -16,6 +16,7 @@ from bigym.action_modes import ActionMode
 from bigym.const import WORLD_MODEL
 from bigym.envs.props.preset import Preset
 from bigym.robots.configs.google_robot import GoogleRobot
+from bigym.robots.configs.aloha import AlohaRobot
 from bigym.robots.robot import Robot
 from bigym.bigym_renderer import BiGymRenderer
 from bigym.utils.callables_cache import CallablesCache
@@ -45,7 +46,7 @@ class BiGymEnv(gym.Env):
     _PRESET_PATH: Optional[Path] = None
     _FLOOR = "floor"
 
-    DEFAULT_ROBOT = GoogleRobot
+    DEFAULT_ROBOT = AlohaRobot
 
     RESET_ROBOT_POS = np.array([0, 0, 0])
     RESET_ROBOT_QUAT = np.array([1, 0, 0, 0])
@@ -73,6 +74,8 @@ class BiGymEnv(gym.Env):
         :param control_frequency: Control loop frequency, 500 Hz by default.
         :param robot_cls: Environment robot class override.
         """
+
+        print("init BiGymEnv")
         # Tracks physics simulation stability
         self._env_health = EnvHealth()
         # Caches results valid for one environment step
@@ -96,10 +99,8 @@ class BiGymEnv(gym.Env):
         self._sub_steps_count = int(
             np.round(CONTROL_FREQUENCY_MAX / self._control_frequency)
         )
-
         self._mojo = Mojo(str(self._MODEL_PATH), timestep=PHYSICS_DT)
         self._robot = (robot_cls or self.DEFAULT_ROBOT)(self.action_mode, self._mojo)
-        print(f"robot: {self._robot}")
         self._preset = Preset(self._mojo, self._PRESET_PATH)
         self._initialize_env()
         self._floor = Geom.get(self._mojo, self._FLOOR)
@@ -121,10 +122,7 @@ class BiGymEnv(gym.Env):
 
         # Validate cameras configuration
         available_cameras = set(self._ENV_CAMERAS + self._robot.config.cameras)
-        print(f" robot cameras: {self._robot.config.cameras}")
-        print(f"available_cameras: {available_cameras}")
         for camera_config in self._observation_config.cameras:
-            print(f"camera_config: {camera_config}")
             assert camera_config.name in available_cameras
 
         # Mapping original camera names to full identifiers
@@ -406,8 +404,83 @@ class BiGymEnv(gym.Env):
         self._mojo.physics.reset()
         self._action = np.zeros_like(self._action)
         self._robot.set_pose(self.RESET_ROBOT_POS, self.RESET_ROBOT_QUAT)
+
         self._on_reset()
+        self.reset_pose()
         return self.get_observation(), self.get_info()
+    
+    def reset_pose(self):
+        keyframe_path = Path("/Users/almondgod/Repositories/aloha-bigym/bigym/envs/xmls/aloha/keyframe_ctrl.xml")
+        if keyframe_path.exists():
+            keyframe_model = mujoco.MjModel.from_xml_path(str(keyframe_path))
+            
+            neutral_pose_key = mujoco.mj_name2id(keyframe_model, mujoco.mjtObj.mjOBJ_KEY, "neutral_pose")
+            
+            if neutral_pose_key != -1:
+                keyframe_qpos = keyframe_model.key_qpos[neutral_pose_key]
+
+                full_qpos = np.zeros(self._mojo.model.nq)
+                full_qpos[:len(keyframe_qpos)] = keyframe_qpos
+
+                #xpos zpos
+                # full_qpos[0] = 0 
+                # full_qpos[1] = 0
+
+                #ypos
+                # full_qpos[2] = 0
+
+                #gripper
+                # full_qpos[3] = 2
+
+                #rotation
+                # full_qpos[4] = 0
+                # full_qpos[5] = 0
+                # full_qpos[6] = 0
+
+                # left lower arm rot
+                full_qpos[7] = 0
+
+                # left lower arm hinge
+                full_qpos[8] = 0
+
+                # left upper arm
+                full_qpos[9] = -2
+
+                # left gripper 
+                full_qpos[10] = 10
+
+                # left gripper pos
+                full_qpos[11] = -2
+
+                # full_qpos[12] = 0
+                # full_qpos[13] = 0
+                # full_qpos[14] = 0
+
+                # right lower arm rot
+                full_qpos[15] = 0
+
+                # right lower arm hinge
+                full_qpos[16] = -2
+
+                # right upper arm
+                full_qpos[17] = -2
+
+                # right gripper
+                full_qpos[18] = 1
+
+                full_qpos[19] = -2
+
+                """
+                0 -0.96 1.16 0 -0.3 0 0.002
+                0 -0.96 1.16 0 -0.3 0 0.002
+                """
+                 
+                self._mojo.data.qpos[:] = full_qpos
+                mujoco.mj_forward(self._mojo.model, self._mojo.data)
+            else:
+                print("Warning: 'neutral_pose' keyframe not found in keyframe_ctrl.xml")
+        else:
+            print("Warning: keyframe_ctrl.xml not found. Falling back to default reset.")
 
     def _on_reset(self):
         """Custom environment reset behaviour."""

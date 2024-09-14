@@ -1,10 +1,17 @@
 <mujoco>
   <keyframe>
-    <key name="neutral_pose" qpos="
-    1 2 3 4 5 6 0.0084 0.0084
-    0 -0.96 1.16 0 -0.3 0 0.0084 0.0084 0 0 0"
-      ctrl="
-    -1 -1 -1 -1 -1 -1 -1
-    -1 -1 -1 -1 -0.3 -1 0.0084  0 0 0"/>
+    <key name="neutral_pose" />
   </keyframe>
 </mujoco>
+
+
+<!-- <mujoco>
+  <keyframe>
+    <key name="neutral_pose" qpos="
+    0 -0.96 1.16 0 -0.3 0 0.002
+    0 -0.96 1.16 0 -0.3 0 0.002"
+      ctrl="
+    0 -0.96 1.16 0 -0.3 0 0.002
+    0 -0.96 1.16 0 -0.3 0 0.002"/>
+  </keyframe>
+</mujoco> -->

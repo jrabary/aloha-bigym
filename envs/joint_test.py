@@ -2,11 +2,16 @@
 from bigym.action_modes import AlohaPositionActionMode
 from bigym.envs.pick_and_place import StoreBox, PickBox
 from bigym.utils.observation_config import ObservationConfig, CameraConfig
-from bigym.robots.configs.aloha import AlohaRobot  
-import numpy as np
+from bigym.robots.configs.aloha import AlohaRobot
 
-import os
-os.environ['MUJOCO_GL'] = 'glfw' 
+def print_joint_positions(env):
+    robot = env.unwrapped._robot
+    mojo = env.unwrapped._mojo
+    print("\nJoint Positions:")
+    for i, actuator in enumerate(robot.limb_actuators):
+        joint_name = actuator.joint
+        joint_pos = mojo.physics.bind(actuator).get_joint_position()
+        print(f"{joint_name}: {joint_pos}")
 
 print("Running 1000 steps with visualization...")
 env = PickBox(
@@ -22,23 +27,33 @@ env = PickBox(
     robot_cls=AlohaRobot
 )
 
+print("Initial robot position:", env.unwrapped._robot._body.get_position())
+print_joint_positions(env)
+
+print("\nObservation Space:")
+print(env.observation_space)
+print("\nAction Space:")
+print(env.action_space)
+
 action = env.action_space.sample()
+print(f"\nSample action: {action}")
 
-action = (np.ones_like(action) / 10 ) - 0.01
-action[-1] = 0.01
-action[-2] = 0.01
-
+print("\nResetting environment...")
 env.reset()
+print_joint_positions(env)
 
-env.reset_pose()
+print("\nRunning simulation...")
 for i in range(1000):
     obs, reward, terminated, truncated, info = env.step(action)
     env.render()
-
-    if i < 2 or i % 200 == 0:
-        print("iteration ", i, " joint position:", env.unwrapped._robot.qpos)
+    
+    if i % 100 == 0:  # Print joint positions every 100 steps
+        print(f"\nStep {i}:")
+        print_joint_positions(env)
     
     if terminated or truncated:
+        print("\nResetting environment...")
         env.reset()
+        print_joint_positions(env)
 
 env.close()

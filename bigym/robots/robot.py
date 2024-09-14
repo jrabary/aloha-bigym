@@ -53,6 +53,8 @@ class Robot(ABC):
         self._body = self._mojo.load_model(
             str(self.config.model), on_loaded=self._on_loaded
         )
+
+        print("initialized body")
         self._grippers = self._get_grippers()
         self._joints = self._get_joints()
 
@@ -176,6 +178,11 @@ class Robot(ABC):
 
     def _get_grippers(self) -> dict[HandSide, Gripper]:
         grippers: dict[HandSide, Gripper] = {}
+
+        print("gripper dict init")
+
+        print(self.config.arms.items())
+
         for side, arm_config in self.config.arms.items():
             grippers[side] = Gripper(
                 side,
@@ -184,6 +191,8 @@ class Robot(ABC):
                 self.config.gripper,
                 self._mojo,
             )
+
+        print("sub gripper init")
         return grippers
 
     def _get_joints(self) -> list[Joint]:

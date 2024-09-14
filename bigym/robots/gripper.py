@@ -159,5 +159,8 @@ class Gripper:
     def _get_pad_geoms(self) -> list[Geom]:
         geoms = []
         for body in self._pad_bodies:
-            geoms.extend([g for g in body.geoms if g.is_collidable()])
+            for g in body.geoms:
+                if g.is_collidable():
+                    geoms.append(g)
+            # geoms.extend([g for g in body.geoms if g.is_collidable()])
         return geoms
