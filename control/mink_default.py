@@ -10,7 +10,6 @@ import mink
 _HERE = Path(__file__).parent
 _XML = "/Users/almondgod/Repositories/aloha-bigym/bigym/envs/xmls/aloha/scene.xml"
 
-# Single arm joint names.
 _JOINT_NAMES = [
     "waist",
     "shoulder",
@@ -29,7 +28,6 @@ if __name__ == "__main__":
     model = mujoco.MjModel.from_xml_path(_XML)
     data = mujoco.MjData(model)
 
-    # Get the dof and actuator ids for the joints we wish to control.
     joint_names: list[str] = []
     velocity_limits: dict[str, float] = {}
     for prefix in ["left", "right"]:
@@ -72,7 +70,7 @@ if __name__ == "__main__":
     ]
     collision_avoidance_limit = mink.CollisionAvoidanceLimit(
         model=model,
-        geom_pairs=collision_pairs,  # type: ignore
+        geom_pairs=collision_pairs, 
         minimum_distance_from_collisions=0.05,
         collision_detection_distance=0.1,
     )
@@ -95,22 +93,14 @@ if __name__ == "__main__":
     ) as viewer:
         mujoco.mjv_defaultFreeCamera(model, viewer.cam)
 
-        # Initialize to the home keyframe.
-        # mujoco.mj_resetDataKeyframe(model, data, model.key("neutral_pose").id)
-        # configuration.update(data.qpos)
-        # mujoco.mj_forward(model, data)
-
-        # Initialize mocap targets at the end-effector site.
         mink.move_mocap_to_frame(model, data, "left_target", "left/gripper", "site")
         mink.move_mocap_to_frame(model, data, "right_target", "right/gripper", "site")
 
         rate = RateLimiter(frequency=200.0)
         while viewer.is_running():
-            # Update task targets.
             l_ee_task.set_target(mink.SE3.from_mocap_name(model, data, "left_target"))
             r_ee_task.set_target(mink.SE3.from_mocap_name(model, data, "right_target"))
 
-            # Compute velocity and integrate into the next configuration.
             for i in range(max_iters):
                 vel = mink.solve_ik(
                     configuration,
@@ -140,6 +130,5 @@ if __name__ == "__main__":
             data.ctrl[actuator_ids] = configuration.q[dof_ids]
             mujoco.mj_step(model, data)
 
-            # Visualize at fixed FPS.
             viewer.sync()
             rate.sleep()

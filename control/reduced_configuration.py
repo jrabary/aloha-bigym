@@ -1,44 +1,8 @@
 import numpy as np
 from typing import Optional
 import mujoco
-from mink.configuration import Configuration  # Adjust the import based on your setup
+from mink.configuration import Configuration 
 from mink.limits import Limit, Constraint
-
-# class ReducedConfiguration(Configuration):
-#     def __init__(self, model, relevant_qpos_indices, relevant_qvel_indices):
-#         super().__init__(model)
-#         self.relevant_qpos_indices = relevant_qpos_indices
-#         self.relevant_qvel_indices = relevant_qvel_indices
-
-#     def update(self, q: Optional[np.ndarray] = None) -> None:
-#         if q is not None:
-#             # Update only relevant qpos entries
-#             self.data.qpos[self.relevant_qpos_indices] = q
-#         super().update()
-
-#     def get_frame_jacobian(self, frame_name: str, frame_type: str) -> np.ndarray:
-#         full_jacobian = super().get_frame_jacobian(frame_name, frame_type)
-#         # Extract relevant columns
-#         reduced_jacobian = full_jacobian[:, self.relevant_qvel_indices]
-#         return reduced_jacobian
-
-#     def integrate_inplace(self, velocity: np.ndarray, dt: float) -> None:
-#         # Create a full velocity vector
-#         full_velocity = np.zeros(self.model.nv)
-#         full_velocity[self.relevant_qvel_indices] = velocity
-#         super().integrate_inplace(full_velocity, dt)
-
-#     @property
-#     def nv(self) -> int:
-#         return len(self.relevant_qvel_indices)
-
-#     @property
-#     def q_relevant(self) -> np.ndarray:
-#         return self.data.qpos[self.relevant_qpos_indices]
-
-#     @q_relevant.setter
-#     def q_relevant(self, value: np.ndarray):
-#         self.data.qpos[self.relevant_qpos_indices] = value
 
 class ReducedConfiguration(Configuration):
     def __init__(self, model, data, relevant_qpos_indices, relevant_qvel_indices):
@@ -66,17 +30,17 @@ class ReducedConfiguration(Configuration):
 
     def update(self, q: Optional[np.ndarray] = None) -> None:
         if q is not None:
-            self.q = q  # Update only relevant qpos entries
+            self.q = q  
         super().update()
 
     def get_frame_jacobian(self, frame_name: str, frame_type: str) -> np.ndarray:
         full_jacobian = super().get_frame_jacobian(frame_name, frame_type)
-        # Extract relevant columns
+
         reduced_jacobian = full_jacobian[:, self.relevant_qvel_indices]
         return reduced_jacobian
 
     def integrate_inplace(self, velocity: np.ndarray, dt: float) -> None:
-        # Create a full velocity vector
+
         full_velocity = np.zeros(self.model.nv)
         full_velocity[self.relevant_qvel_indices] = velocity
         super().integrate_inplace(full_velocity, dt)
@@ -115,10 +79,9 @@ class ReducedConfiguration(Configuration):
     @property
     def relevant_joints(self) -> np.ndarray:
         """Get the joint IDs corresponding to the relevant qpos indices."""
-        # Map qpos indices back to joint IDs
+
         joint_ids = []
         for qpos_idx in self.relevant_qpos_indices:
-            # Find the joint that corresponds to this qpos index
             jnt = np.where(self.model.jnt_qposadr == qpos_idx)[0][0]
             joint_ids.append(jnt)
         return np.array(joint_ids)
@@ -129,7 +92,6 @@ class ReducedConfigurationLimit(Limit):
         self.relevant_qpos_indices = relevant_qpos_indices
         nq_reduced = len(relevant_qpos_indices)
         
-        # Map qpos indices to joint IDs
         joint_indices = []
         for qpos_idx in relevant_qpos_indices:
             jnt = np.where(model.jnt_qposadr == qpos_idx)[0]
@@ -149,12 +111,9 @@ class ReducedConfigurationLimit(Limit):
     def compute_qp_inequalities(self, configuration: Configuration, dt: float) -> Constraint:
         qpos0 = configuration.q
         dq = configuration.dq
-        # Compute qpos1
         qpos1 = qpos0 + dq * dt
-        # Compute differences
         lower = (self.qpos_min - qpos0) / dt
         upper = (self.qpos_max - qpos0) / dt
-        # Build G and h
         G = np.vstack([-np.eye(self.nq_reduced), np.eye(self.nq_reduced)])
         h = np.hstack([-lower, upper])
         return Constraint(G=G, h=h)

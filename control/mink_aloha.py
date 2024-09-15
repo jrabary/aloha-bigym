@@ -87,6 +87,8 @@ class AlohaMocapControl:
         
         print(f"l_ee_task: {l_ee_task.frame_name}")
 
+
+        # manual target position setting
         # l_ee_task.set_target(mink.SE3.from_translation(np.array([0.5, 1, 0.5])))
         # r_ee_task.set_target(mink.SE3.from_translation(np.array([-1, 1, 0.5])))
         
@@ -105,7 +107,7 @@ class AlohaMocapControl:
 
         collision_avoidance_limit = mink.CollisionAvoidanceLimit(
             model=model,
-            geom_pairs=collision_pairs,  # type: ignore
+            geom_pairs=collision_pairs, 
             minimum_distance_from_collisions=0.05,
             collision_detection_distance=0.1,
         )
@@ -131,7 +133,6 @@ class AlohaMocapControl:
             mujoco.mj_forward(model, data)
 
             target = self.generate_random_target()
-            # r_target = self.generate_random_target()
 
             l_ee_task.set_target(mink.SE3.from_translation(target))
             r_ee_task.set_target(mink.SE3.from_translation(target))
@@ -144,12 +145,7 @@ class AlohaMocapControl:
                 condition_number = np.linalg.cond(jacobian)
                 print("Jacobian Condition Number:", condition_number)
 
-                # Compute velocity and integrate into the next configuration.
                 for i in range(max_iters):
-                    # print(f"Left gripper position: {data.site_xpos[model.site('aloha_scene/left_gripper').id]}")
-                    # print(f"Right gripper position: {data.site_xpos[model.site('aloha_scene/right_gripper').id]}")
-                    # print(f"Target position: {self.data.site_xpos[self.target_site_id]}")
-                    # configuration.q[:] = data.qpos
 
                     vel = mink.solve_ik(
                         configuration,
@@ -165,15 +161,6 @@ class AlohaMocapControl:
 
                     print(f"self qpos: {self.env.unwrapped._mojo.data.qpos}")
 
-                    # l_err = l_ee_task.compute_error(configuration)
-                    # # print(f"Left error: {l_err}")
-                    # l_pos_achieved = np.linalg.norm(l_err[:3]) < pos_threshold
-                    # l_ori_achieved = np.linalg.norm(l_err[3:]) < ori_threshold
-
-                    # r_err = r_ee_task.compute_error(configuration)  
-                    # # print(f"Right error: {r_err}")
-                    # r_pos_achieved = np.linalg.norm(r_err[:3]) < pos_threshold
-                    # r_ori_achieved = np.linalg.norm(r_err[3:]) < ori_threshold
                     left_gripper_pos = data.site_xpos[model.site('aloha_scene/left_gripper').id]
                     right_gripper_pos = data.site_xpos[model.site('aloha_scene/right_gripper').id]
                     target_pos = self.data.site_xpos[self.target_site_id]
@@ -200,24 +187,20 @@ class AlohaMocapControl:
                     
                 data.ctrl[actuator_ids] = configuration.q[dof_ids]
                
-                # Step the simulation
                 mujoco.mj_step(model, data)
                 print(f"Control inputs (data.ctrl): {data.ctrl[actuator_ids]}")
                 print(f"Actuator forces (data.actuator_force): {data.actuator_force[actuator_ids]}")
 
-                # print(f"control choice: {data.ctrl[actuator_ids]}")
                 print(f"model: {model}")
                 mujoco.mj_step(model, data)
 
-                # Visualize at fixed FPS.
                 viewer.sync()
                 rate.sleep()
 
     def generate_random_target(self):
-        # Define the workspace limits for the ALOHA arms
         x_range = (-0.2, 0.2)
         y_range = (-0.2, 0.2)
-        z_range = (1, 1.2)  #height
+        z_range = (1, 1.2)  
 
         x = np.random.uniform(*x_range)
         y = np.random.uniform(*y_range)
@@ -233,7 +216,6 @@ class AlohaMocapControl:
     def update_target_site(self, target):
         self.data.site_xpos[self.target_site_id] = target
         self.model.site_pos[self.target_site_id] = target
-        
 
 if __name__ == "__main__":
     controller = AlohaMocapControl()

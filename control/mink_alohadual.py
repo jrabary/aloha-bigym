@@ -12,7 +12,6 @@ from reduced_configuration import ReducedConfiguration, ReducedConfigurationLimi
 from loop_rate_limiters import RateLimiter
 import time
 
-# Joint names for both arms
 _JOINT_NAMES = [
     "waist",
     "shoulder",
@@ -22,7 +21,6 @@ _JOINT_NAMES = [
     "wrist_rotate",
 ]
 
-# Velocity limits for the joints
 _VELOCITY_LIMITS = {k: np.pi for k in _JOINT_NAMES}
 
 class AlohaMocapControl:
@@ -46,7 +44,6 @@ class AlohaMocapControl:
         model = self.model
         data = self.data
 
-        # Collect joint names and velocity limits for both arms
         left_joint_names = []
         right_joint_names = []
         velocity_limits = {}
@@ -59,21 +56,18 @@ class AlohaMocapControl:
             velocity_limits[name_left] = _VELOCITY_LIMITS[n]
             velocity_limits[name_right] = _VELOCITY_LIMITS[n]
 
-        # Left arm configuration
         left_dof_ids = np.array([model.joint(name).id for name in left_joint_names])
         left_actuator_ids = np.array([model.actuator(name).id for name in left_joint_names])
         left_relevant_qpos_indices = np.array([model.jnt_qposadr[model.joint(name).id] for name in left_joint_names])
         left_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in left_joint_names])
         left_configuration = ReducedConfiguration(model, data, left_relevant_qpos_indices, left_relevant_qvel_indices)
 
-        # Right arm configuration
         right_dof_ids = np.array([model.joint(name).id for name in right_joint_names])
         right_actuator_ids = np.array([model.actuator(name).id for name in right_joint_names])
         right_relevant_qpos_indices = np.array([model.jnt_qposadr[model.joint(name).id] for name in right_joint_names])
         right_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in right_joint_names])
         right_configuration = ReducedConfiguration(model, data, right_relevant_qpos_indices, right_relevant_qvel_indices)
 
-        # Define tasks for both arms
         l_ee_task = mink.FrameTask(
                 frame_name="aloha_scene/left_gripper",
                 frame_type="site",
@@ -122,12 +116,6 @@ class AlohaMocapControl:
             collision_avoidance_limit,
         ]
 
-        limits = [
-            # mink.ConfigurationLimit(model, left_relevant_qpos_indices),
-            mink.VelocityLimit(model, velocity_limits),
-            collision_avoidance_limit,
-        ]
-
         solver = "osqp"
         pos_threshold = 0.1
         ori_threshold = 0.1
@@ -138,23 +126,19 @@ class AlohaMocapControl:
         ) as viewer:
             mujoco.mjv_defaultFreeCamera(model, viewer.cam)
 
-            # Add target sites and generate random targets (positions and rotations)
             self.add_target_sites()
             mujoco.mj_forward(model, data)
 
             target_l, target_r, rot_l, rot_r = self.generate_random_targets()
 
-            # Set target positions and orientations for the tasks
             l_target_pose = mink.SE3.from_rotation_and_translation(rot_l, target_l)
             r_target_pose = mink.SE3.from_rotation_and_translation(rot_r, target_r)
 
             l_ee_task.set_target(l_target_pose)
             r_ee_task.set_target(r_target_pose)
 
-            # Update target sites for visualization
             self.update_target_sites(target_l, target_r, rot_l, rot_r)
 
-            # Get current positions and orientations
             left_gripper_pos = data.site_xpos[model.site('aloha_scene/left_gripper').id]
             right_gripper_pos = data.site_xpos[model.site('aloha_scene/right_gripper').id]
             left_gripper_rot = data.site_xmat[model.site('aloha_scene/left_gripper').id].reshape(3, 3)
@@ -168,7 +152,7 @@ class AlohaMocapControl:
             print(f"Target l orientation: {rot_l.as_matrix()}")
             print(f"Right gripper orientation: {right_gripper_rot}")
             print(f"Target r orientation: {rot_r.as_matrix()}")
-                            
+
             rate = RateLimiter(frequency=200.0)
             while viewer.is_running():
                 left_jacobian = left_configuration.get_frame_jacobian("aloha_scene/left_gripper", "site")
@@ -177,14 +161,12 @@ class AlohaMocapControl:
                 print("left condition number:", np.linalg.cond(left_jacobian))
                 print("left jacobian matrix:\n", left_jacobian)
 
-                # Right arm Jacobian
                 right_jacobian = right_configuration.get_frame_jacobian("aloha_scene/right_gripper", "site")
                 right_jacobian_rank = np.linalg.matrix_rank(right_jacobian)
                 print("Right Jacobian Rank:", right_jacobian_rank)
                 print("right condition number:", np.linalg.cond(right_jacobian))
                 print("right jacobian matrix:\n", right_jacobian)
 
-                # Compute velocity and integrate into the next configuration.
                 for i in range(max_iters):
                     left_vel = mink.solve_ik(
                         left_configuration,
@@ -195,7 +177,6 @@ class AlohaMocapControl:
                         damping=1e-3,
                     )
 
-                    # Solve IK for the right arm
                     right_vel = mink.solve_ik(
                         right_configuration,
                         [r_ee_task],
@@ -205,7 +186,6 @@ class AlohaMocapControl:
                         damping=1e-3,
                     )
 
-                    # Update configurations
                     left_configuration.integrate_inplace(left_vel, rate.dt)
                     right_configuration.integrate_inplace(right_vel, rate.dt)
 
@@ -215,27 +195,17 @@ class AlohaMocapControl:
                     data.qvel[left_relevant_qvel_indices] = left_configuration.dq
                     data.qvel[right_relevant_qvel_indices] = right_configuration.dq
 
-                    # Get current positions and orientations
                     left_gripper_pos = data.site_xpos[model.site('aloha_scene/left_gripper').id]
                     right_gripper_pos = data.site_xpos[model.site('aloha_scene/right_gripper').id]
                     left_gripper_rot = data.site_xmat[model.site('aloha_scene/left_gripper').id].reshape(3, 3)
                     right_gripper_rot = data.site_xmat[model.site('aloha_scene/right_gripper').id].reshape(3, 3)
 
-                    # Compute position and orientation errors
                     l_pos_error = np.linalg.norm(left_gripper_pos - target_l)
                     r_pos_error = np.linalg.norm(right_gripper_pos - target_r)
 
                     l_ori_error = np.linalg.norm(left_gripper_rot - rot_l.as_matrix())
                     r_ori_error = np.linalg.norm(right_gripper_rot - rot_r.as_matrix())
 
-                    # print(f"Left gripper position: {left_gripper_pos}")
-                    # print(f"Target l position: {target_l}")
-                    # print(f"Right gripper position: {right_gripper_pos}")
-                    # print(f"Target r position: {target_r}")
-                    # print(f"Left gripper orientation: {left_gripper_rot}")
-                    # print(f"Target l orientation: {rot_l.as_matrix()}")
-                    # print(f"Right gripper orientation: {right_gripper_rot}")
-                    # print(f"Target r orientation: {rot_r.as_matrix()}")
                     print(f"Left position error: {l_pos_error}")
                     print(f"Right position error: {r_pos_error}")
                     print(f"Left orientation error: {l_ori_error}")
@@ -244,8 +214,6 @@ class AlohaMocapControl:
                     l_pos_achieved = l_pos_error < pos_threshold
                     r_pos_achieved = r_pos_error < pos_threshold
 
-                    # l_ori_achieved = l_ori_error < ori_threshold
-                    # r_ori_achieved = r_ori_error < ori_threshold
                     l_ori_achieved = True
                     r_ori_achieved = True
 
@@ -253,14 +221,12 @@ class AlohaMocapControl:
                         print(f"Target reached after {i} iterations.")
                         target_l, target_r, rot_l, rot_r = self.generate_random_targets()
 
-                        # Set target positions and orientations for the tasks
                         l_target_pose = mink.SE3.from_rotation_and_translation(rot_l, target_l)
                         r_target_pose = mink.SE3.from_rotation_and_translation(rot_r, target_r)
 
                         l_ee_task.set_target(l_target_pose)
                         r_ee_task.set_target(r_target_pose)
 
-                        # Update target sites for visualization
                         self.update_target_sites(target_l, target_r, rot_l, rot_r)
 
                         print("")
@@ -269,75 +235,42 @@ class AlohaMocapControl:
                     data.ctrl[left_actuator_ids] = left_configuration.q
                     data.ctrl[right_actuator_ids] = right_configuration.q
                 
-                    # Step the simulation
                     mujoco.mj_step(model, data)
 
-                    # Visualize at fixed FPS.
                     viewer.sync()
                     rate.sleep()
 
-                    # Step the simulation
-                    # mujoco.mj_step(model, data)
-                        
-                # print(f"left_dof_ids: {left_dof_ids}")
-                # print(f"left config q length: {len(left_configuration.q)}")
-                # print(f"left actuator ids: {left_actuator_ids}")
-                # print(f"right_dof_ids: {right_dof_ids}")
-                # print(f"right config q length: {len(right_configuration.q)}")
-                # print(f"right actuator ids: {right_actuator_ids}")
-
-                # Apply the computed joint positions to the actuators
-                # data.ctrl[left_actuator_ids] = left_configuration.q[left_actuator_ids]
-                # data.ctrl[right_actuator_ids] = right_configuration.q[right_actuator_ids - 6]
                 data.ctrl[left_actuator_ids] = left_configuration.q
                 data.ctrl[right_actuator_ids] = right_configuration.q
                
-                # Step the simulation
                 mujoco.mj_step(model, data)
 
-                # Visualize at fixed FPS.
                 viewer.sync()
                 rate.sleep()
 
     def generate_random_targets(self):
-        # Define the workspace limits for the left arm
         x_range_left = (-0.4, -0.1)
         y_range_left = (-0.2, 0.2)
         z_range_left = (1.0, 1.2)
 
-        # Random position for left target
         x_l = np.random.uniform(*x_range_left)
         y_l = np.random.uniform(*y_range_left)
         z_l = np.random.uniform(*z_range_left)
         target_l = np.array([x_l, y_l, z_l])
 
-        # Define the workspace limits for the right arm
         x_range_right = (0.1, 0.4)
         y_range_right = (-0.2, 0.2)
         z_range_right = (1.0, 1.2)
 
-        # Random position for right target
         x_r = np.random.uniform(*x_range_right)
         y_r = np.random.uniform(*y_range_right)
         z_r = np.random.uniform(*z_range_right)
         target_r = np.array([x_r, y_r, z_r])
 
-        # rot_l = np.array([np.random.uniform(0, 2 * np.pi), np.random.uniform(0, 2 * np.pi), np.random.uniform(0, 2 * np.pi), np.random.uniform(0, 2 * np.pi)])
-        # rot_r = np.array([np.random.uniform(0, 2 * np.pi), np.random.uniform(0, 2 * np.pi), np.random.uniform(0, 2 * np.pi), np.random.uniform(0, 2 * np.pi)])
-
-        #         Left gripper orientation: [[ 0.98594576  0.16076923 -0.04543352]
-        #  [ 0.16076923 -0.83907153  0.51972322]
-        #  [ 0.04543352 -0.51972322 -0.85312577]]
-        # Right gripper orientation: [[-0.69831662  0.47513026  0.53535514]
-        #  [ 0.24867168 -0.54030231  0.80388794]
-        #  [ 0.6712051   0.69449597  0.25915064]]
-
         rot_l = SO3.sample_uniform()
         rot_r = SO3.sample_uniform()
 
-        # rot_l = SO3.from_matrix(np.array([[ 0.98287616,  0.00586364,  0.18417404], [ 0.00929491, -0.99979885, -0.01777276], [ 0.18403278,  0.01918031, -0.98273295]]))
-        # rot_r = SO3.from_matrix(np.array([[-0.87198589, -0.48937584, -0.01232488], [ 0.0654842,  -0.14155857,  0.98776161], [-0.48513136,  0.86050709,  0.15548347]]))
-
+        # manual rotation
         # rot_l = SO3.from_matrix(np.array([[ 0.98594576,  0.16076923, -0.04543352], [ 0.16076923, -0.83907153,  0.51972322], [ 0.04543352, -0.51972322, -0.85312577]]))
         # rot_r = SO3.from_matrix(np.array([[-0.69831662,  0.47513026,  0.53535514], [ 0.24867168, -0.54030231,  0.80388794], [ 0.6712051,   0.69449597,  0.25915064]]))
 
@@ -350,25 +283,16 @@ class AlohaMocapControl:
         self.update_target_sites(target_l, target_r, rot_l, rot_r)
 
     def update_target_sites(self, target_l, target_r, rot_l, rot_r):
-        # Update positions
         self.data.site_xpos[self.target_site_id_l] = target_l
         self.model.site_pos[self.target_site_id_l] = target_l
         self.data.site_xpos[self.target_site_id_r] = target_r
         self.model.site_pos[self.target_site_id_r] = target_r
 
-        # Update orientations
-        # self.data.site_xmat[self.target_site_id_l] = rot_l
-        # self.model.site_quat[self.target_site_id_l] = rot_l
-        # self.data.site_xmat[self.target_site_id_r] = rot_r
-        # self.model.site_quat[self.target_site_id_r] = rot_r
-
         rot_l_matrix_flat = rot_l.as_matrix().flatten()
         rot_r_matrix_flat = rot_r.as_matrix().flatten()
 
         self.data.site_xmat[self.target_site_id_l] = rot_l_matrix_flat
-        # self.model.site_mat[self.target_site_id_l] = rot_l_matrix_flat
         self.data.site_xmat[self.target_site_id_r] = rot_r_matrix_flat
-        # self.model.site_mat[self.target_site_id_r] = rot_r_matrix_flat
 
 if __name__ == "__main__":
     controller = AlohaMocapControl()
