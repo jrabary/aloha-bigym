@@ -2,7 +2,8 @@ import numpy as np
 import mujoco
 import mujoco.viewer
 import mink
-from bigym.envs.pick_and_place import PickBox
+from bigym.envs.pick_and_place import PickBox, TakeCups
+from bigym.envs.manipulation import StackBlocks
 from bigym.action_modes import AlohaPositionActionMode
 from bigym.utils.observation_config import ObservationConfig, CameraConfig
 from bigym.robots.configs.aloha import AlohaRobot
@@ -25,7 +26,7 @@ _VELOCITY_LIMITS = {k: np.pi for k in _JOINT_NAMES}
 
 class AlohaMocapControl:
     def __init__(self):
-        self.env = PickBox(
+        self.env = TakeCups(
             action_mode=AlohaPositionActionMode(floating_base=False, absolute=False, control_all_joints=True),
             observation_config=ObservationConfig(
                 cameras=[
@@ -39,10 +40,22 @@ class AlohaMocapControl:
         
         self.model = self.env.unwrapped._mojo.model
         self.data = self.env.unwrapped._mojo.data
+
+        self.left_gripper_actuator_id = self.model.actuator("aloha_scene/aloha_gripper_left/gripper_actuator").id
+        self.right_gripper_actuator_id = self.model.actuator("aloha_scene/aloha_gripper_right/gripper_actuator").id
+
+    def control_gripper(self, left_gripper_position, right_gripper_position):
+        # Args: gripper_position (float): A value between 0.002 (closed) and 0.037 (open).
+        left_gripper_position = np.clip(left_gripper_position, 0.002, 0.037)
+        right_gripper_position = np.clip(right_gripper_position, 0.002, 0.037)
+        self.data.ctrl[self.left_gripper_actuator_id] = left_gripper_position
+        self.data.ctrl[self.right_gripper_actuator_id] = right_gripper_position
         
     def run(self):
         model = self.model
         data = self.data
+
+        self.control_gripper(0.037, 0.037)
 
         left_joint_names = []
         right_joint_names = []

@@ -406,7 +406,7 @@ class BiGymEnv(gym.Env):
         self._robot.set_pose(self.RESET_ROBOT_POS, self.RESET_ROBOT_QUAT)
 
         self._on_reset()
-        self.reset_pose()
+        # self.reset_pose()
         return self.get_observation(), self.get_info()
     
     def reset_pose(self):
