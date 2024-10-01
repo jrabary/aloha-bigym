@@ -4,6 +4,8 @@ import mujoco.viewer
 import mink
 from bigym.envs.pick_and_place import PickBox, TakeCups
 from bigym.envs.manipulation import StackBlocks
+from bigym.envs.dishwasher import DishwasherOpen, DishwasherClose, DishwasherOpenTrays
+from bigym.envs.dishwasher_plates import DishwasherLoadPlates
 from bigym.action_modes import AlohaPositionActionMode
 from bigym.utils.observation_config import ObservationConfig, CameraConfig
 from bigym.robots.configs.aloha import AlohaRobot
@@ -12,7 +14,10 @@ from mink import SO3
 from reduced_configuration import ReducedConfiguration
 from loop_rate_limiters import RateLimiter
 import threading
-from pynput import mouse  
+# from pynput import mouse  
+import glfw
+from pyjoycon import JoyCon, get_R_id, get_L_id
+import time
 
 _JOINT_NAMES = [
     "waist",
@@ -27,7 +32,10 @@ _VELOCITY_LIMITS = {k: np.pi for k in _JOINT_NAMES}
 
 class AlohaMocapControl:
     def __init__(self):
-        self.env = StackBlocks(
+        self.joycon_L = JoyCon(*get_L_id())
+        self.joycon_R = JoyCon(*get_R_id())
+
+        self.env = DishwasherClose(
             action_mode=AlohaPositionActionMode(floating_base=False, absolute=False, control_all_joints=True),
             observation_config=ObservationConfig(
                 cameras=[
@@ -45,64 +53,167 @@ class AlohaMocapControl:
         self.target_l = np.array([-0.25, 0.0, 1.1])
         self.target_r = np.array([0.25, 0.0, 1.1])
         self.rot_l = SO3.identity()
-        self.rot_r = SO3.identity()
+        self.rot_r = SO3.from_matrix(-np.eye(3))
         self.targets_updated = False  
 
         self.x_min, self.x_max = -0.4, 0.4
         self.y_min, self.y_max = -0.4, 0.4
         self.z_min, self.z_max = 0.8, 1.4
 
-        self.delta = 0.01
-
-        self.mouse_listener = mouse.Listener(on_scroll=self.on_scroll, on_click=self.on_click)
-        self.mouse_listener.start()
-
         self.left_gripper_actuator_id = self.model.actuator("aloha_scene/aloha_gripper_left/gripper_actuator").id
         self.right_gripper_actuator_id = self.model.actuator("aloha_scene/aloha_gripper_right/gripper_actuator").id
-        self.left_gripper_pos = 0.02
-        self.right_gripper_pos = 0.02
+        self.left_gripper_pos = 0.037
+        self.right_gripper_pos = 0.037
+
+        self.dt = 1/60
+
+        self.accel_filter_alpha = 0.8 # 0-1 (1 is peak filter)
+        self.previous_accel_l = np.zeros(3)
+        self.previous_filtered_accel_l = np.zeros(3)
+        self.previous_accel_r = np.zeros(3)
+        self.previous_filtered_accel_r = np.zeros(3)
+
+        self.gravity_magnitude_right = 0
+        self.gravity_magnitude_left = 0
+
+        self.calibrate()
+
+    def calibrate(self):
+        num_samples = 100
+        right_samples = []
+        left_samples = []
+        for _ in range(num_samples):
+            status = self.joycon_L.get_status()
+            status_R = self.joycon_R.get_status()
+            accel = status['accel']
+            accel_R = status_R['accel']
+            rot = status['gyro']
+            rot_R = status_R['gyro']
+            joystick = status['analog-sticks']['left']
+            joystick_R = status_R['analog-sticks']['right']
+
+            left_samples.append([accel['x'], accel['y'], accel['z'], rot['x'], rot['y'], rot['z'], joystick['horizontal'], joystick['vertical']])
+            right_samples.append([accel_R['x'], accel_R['y'], accel_R['z'], rot_R['x'], rot_R['y'], rot_R['z'], joystick_R['horizontal'], joystick_R['vertical']])
+            time.sleep(0.01)
+        
+        self.right_calibration_offset = np.mean(right_samples, axis=0)
+        self.left_calibration_offset = np.mean(left_samples, axis=0)
+
+        self.gravity_magnitude_right = self.right_calibration_offset[2] 
+        self.gravity_magnitude_left = self.left_calibration_offset[2] 
+
+    def so3_to_matrix(self, so3_rotation: SO3) -> np.ndarray:
+        return so3_rotation.as_matrix()
+
+    def matrix_to_so3(self, rotation_matrix: np.ndarray) -> SO3:
+        return SO3.from_matrix(rotation_matrix)
+
+    def apply_rotation(self, current_rotation: SO3, rotation_change: np.ndarray) -> SO3:
+        rotation_matrix = self.so3_to_matrix(current_rotation)
+        change_matrix = SO3.exp(rotation_change).as_matrix()
+        new_rotation_matrix = change_matrix @ rotation_matrix
+        return self.matrix_to_so3(new_rotation_matrix)
+
+    def update_rotation(self, axis: str, angle: float, side: str):
+        rotation_change = np.zeros(3)
+        if axis == 'x':
+            rotation_change[0] = angle
+        elif axis == 'y':
+            rotation_change[1] = angle
+        elif axis == 'z':
+            rotation_change[2] = angle
+        
+        if side == 'left':
+            self.rot_l = self.apply_rotation(self.rot_l, rotation_change)
+        else:
+            self.rot_r = self.apply_rotation(self.rot_r, rotation_change)
+        self.targets_updated = True
+
+    def accel_to_translation_matrix(self, accel, dt):
+        translation = (accel * dt**2) / 2
+        translation_matrix = np.eye(4)
+        translation_matrix[:3, 3] = translation
+        return translation_matrix
+    
+    def high_pass_filter(self, old_value, new_value, old_filtered, alpha):
+        return alpha * (new_value - old_value + old_filtered)
+    
+    def compensate_gravity(self, accel_vec, rotation, gravity_magnitude):
+        gravity_local = rotation.apply(np.array([0, 0, self.gravity_magnitude_left]))
+        return accel_vec - gravity_local
+
+    def joycon_control_l(self):
+        status = self.joycon_L.get_status()
+        rotation = status['gyro']
+        button_lower = status['buttons']['left']['zl']
+        button_higher = status['buttons']['left']['l']
+        joystick = status['analog-sticks']['left']
+        up = status['buttons']['left']['up']
+        down = status['buttons']['left']['down']
+
+        #translation
+        if button_lower == 1:
+            self.target_l[2] -= 0.03
+        elif button_higher == 1:
+            self.target_l[2] += 0.03
+
+        self.target_l[0] += (joystick['horizontal'] - self.left_calibration_offset[6]) * 0.00005
+        self.target_l[1] += (joystick['vertical'] - self.left_calibration_offset[7]) * 0.00005
+
+        # Clip target position to bounds
+        self.target_l = np.clip(self.target_l, [self.x_min, self.y_min, self.z_min], [self.x_max, self.y_max, self.z_max])
+
+        #rotation
+        self.update_rotation('x', rotation['x'] * 0.0001, 'left')
+        self.update_rotation('y', rotation['y'] * 0.0001, 'left')
+        self.update_rotation('z', rotation['z'] * 0.0001, 'left')
+
+        #gripper
+        if up == 1:
+            self.left_gripper_pos = 0.037
+        elif down == 1:
+            self.left_gripper_pos = 0.002
+        self.targets_updated = True
+
+    def joycon_control_r(self):
+        status = self.joycon_R.get_status()
+        rotation = status['gyro']
+        button_lower = status['buttons']['right']['zr']
+        button_higher = status['buttons']['right']['r']
+        joystick = status['analog-sticks']['right']
+        up = status['buttons']['right']['x']
+        down = status['buttons']['right']['b']
+
+        #translation
+        if button_higher == 1:
+            self.target_r[2] += 0.03
+        elif button_lower == 1:
+            self.target_r[2] -= 0.03
+
+        self.target_r[0] += (joystick['horizontal'] - self.right_calibration_offset[6]) * 0.00005
+        self.target_r[1] += (joystick['vertical'] - self.right_calibration_offset[7]) * 0.00005
+
+        # Clip target position to bounds
+        self.target_r = np.clip(self.target_r, [self.x_min, self.y_min, self.z_min], [self.x_max, self.y_max, self.z_max])
+
+        #rotation
+        self.update_rotation('x', rotation['x'] * 0.0001, 'right')
+        self.update_rotation('y', rotation['y'] * 0.0001, 'right')
+        self.update_rotation('z', rotation['z'] * 0.0001, 'right')
+
+        #gripper
+        if up == 1: 
+            self.right_gripper_pos = 0.0037
+        elif down == 1:
+            self.right_gripper_pos = 0.002
+        self.targets_updated = True
 
     def control_gripper(self, left_gripper_position, right_gripper_position):
         # Args: gripper_position (float): A value between 0.002 (closed) and 0.037 (open).
-        left_gripper_position = np.clip(left_gripper_position, 0.002, 0.037)
-        right_gripper_position = np.clip(right_gripper_position, 0.002, 0.037)
+        left_gripper_position = np.clip(left_gripper_position, 0.02, 0.037)
+        right_gripper_position = np.clip(right_gripper_position, 0.02, 0.037)
         self.data.ctrl[self.left_gripper_actuator_id] = left_gripper_position
         self.data.ctrl[self.right_gripper_actuator_id] = right_gripper_position
-        
-    def on_scroll(self, x, y, dx, dy):
-        if dx > 0:
-            self.target_l[0] += self.delta
-            self.left_gripper_pos += self.delta
-            self.right_gripper_pos += self.delta
-        elif dx < 0:
-            self.target_l[0] -= self.delta
-            self.left_gripper_pos -= self.delta
-            self.right_gripper_pos -= self.delta
-
-        if dy < 0:
-            self.target_l[1] += self.delta
-        elif dy > 0:
-            self.target_l[1] -= self.delta
-
-        self.target_l[0] = np.clip(self.target_l[0], self.x_min, self.x_max)
-        self.target_l[1] = np.clip(self.target_l[1], self.y_min, self.y_max)
-        self.left_gripper_pos = np.clip(self.left_gripper_pos, 0.002, 0.037)
-        self.right_gripper_pos = np.clip(self.right_gripper_pos, 0.002, 0.037)
-
-        self.targets_updated = True
-        print(f"New target_l x position: {self.target_l[0]}")
-
-    def on_click(self, x, y, button, pressed):
-        if pressed:
-            if button == mouse.Button.left:
-                self.target_l[2] += self.delta
-            elif button == mouse.Button.right:
-                self.target_l[2] -= self.delta
-
-            self.target_l[2] = np.clip(self.target_l[2], self.z_min, self.z_max)
-
-            self.targets_updated = True
-            print(f"New target_l z position: {self.target_l[2]}")
     
     def run(self):
         model = self.model
@@ -165,7 +276,7 @@ class AlohaMocapControl:
         max_iters = 20
 
         with mujoco.viewer.launch_passive(
-            model=model, data=data, show_left_ui=False, show_right_ui=False
+            model=model, data=data, show_left_ui=True, show_right_ui=False
         ) as viewer:
             mujoco.mjv_defaultFreeCamera(model, viewer.cam)
 
@@ -180,13 +291,17 @@ class AlohaMocapControl:
 
             rate = RateLimiter(frequency=200.0)
             while viewer.is_running():
+                self.joycon_control_l()
+                self.joycon_control_r()
+                
                 self.control_gripper(self.left_gripper_pos, self.right_gripper_pos)
                 if self.targets_updated:
                     l_target_pose = mink.SE3.from_rotation_and_translation(self.rot_l, self.target_l)
                     l_ee_task.set_target(l_target_pose)
+                    r_target_pose = mink.SE3.from_rotation_and_translation(self.rot_r, self.target_r)
+                    r_ee_task.set_target(r_target_pose)
 
                     self.update_target_sites(self.target_l, self.target_r, self.rot_l, self.rot_r)
-
                     self.targets_updated = False
 
                 for _ in range(max_iters):
@@ -199,7 +314,15 @@ class AlohaMocapControl:
                         damping=1e-3,
                     )
 
-                    right_vel = np.zeros_like(right_configuration.dq)
+                    # right_vel = np.zeros_like(right_configuration.dq)
+                    right_vel = mink.solve_ik(
+                        right_configuration,
+                        [r_ee_task],
+                        rate.dt,
+                        solver,
+                        limits=limits,
+                        damping=1e-3,
+                    )
 
                     left_configuration.integrate_inplace(left_vel, rate.dt)
                     right_configuration.integrate_inplace(right_vel, rate.dt)
@@ -214,14 +337,14 @@ class AlohaMocapControl:
                     data.ctrl[right_actuator_ids] = right_configuration.q
 
                     self.control_gripper(self.left_gripper_pos, self.right_gripper_pos)
-                    print(f"self.left_gripper_pos: {self.left_gripper_pos}, self.right_gripper_pos: {self.right_gripper_pos}")
+                    # print(f"self.left_gripper_pos: {self.left_gripper_pos}, self.right_gripper_pos: {self.right_gripper_pos}")
 
                     mujoco.mj_step(model, data)
 
                     viewer.sync()
                     rate.sleep()
 
-            self.mouse_listener.stop()
+            
 
     def add_target_sites(self):
         self.target_site_id_l = self.model.site('aloha_scene/target').id

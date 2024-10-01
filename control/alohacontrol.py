@@ -13,6 +13,7 @@ from reduced_configuration import ReducedConfiguration
 from loop_rate_limiters import RateLimiter
 import threading
 from pynput import mouse  
+import glfw
 
 _JOINT_NAMES = [
     "waist",
@@ -52,20 +53,135 @@ class AlohaMocapControl:
         self.y_min, self.y_max = -0.4, 0.4
         self.z_min, self.z_max = 0.8, 1.4
 
-        self.delta = 0.01
+        self.delta = 0.04
 
         self.mouse_listener = mouse.Listener(on_scroll=self.on_scroll, on_click=self.on_click)
         self.mouse_listener.start()
 
         self.left_gripper_actuator_id = self.model.actuator("aloha_scene/aloha_gripper_left/gripper_actuator").id
         self.right_gripper_actuator_id = self.model.actuator("aloha_scene/aloha_gripper_right/gripper_actuator").id
-        self.left_gripper_pos = 0.02
-        self.right_gripper_pos = 0.02
+        self.left_gripper_pos = 0.037
+        self.right_gripper_pos = 0.037
+
+    def so3_to_matrix(self, so3_rotation: SO3) -> np.ndarray:
+        return so3_rotation.as_matrix()
+
+    def matrix_to_so3(self, rotation_matrix: np.ndarray) -> SO3:
+        return SO3.from_matrix(rotation_matrix)
+
+    def apply_rotation(self, current_rotation: SO3, rotation_change: np.ndarray) -> SO3:
+        rotation_matrix = self.so3_to_matrix(current_rotation)
+        change_matrix = SO3.exp(rotation_change).as_matrix()
+        new_rotation_matrix = change_matrix @ rotation_matrix
+        return self.matrix_to_so3(new_rotation_matrix)
+
+    def update_rotation(self, axis: str, angle: float):
+        rotation_change = np.zeros(3)
+        if axis == 'x':
+            rotation_change[0] = angle
+        elif axis == 'y':
+            rotation_change[1] = angle
+        elif axis == 'z':
+            rotation_change[2] = angle
+        
+        self.rot_l = self.apply_rotation(self.rot_l, rotation_change)
+        self.rot_r = self.apply_rotation(self.rot_r, rotation_change)
+        self.targets_updated = True
+
+    def keyboard_callback(self, keycode):
+        rotation_angle = 0.1 
+        keycode = chr(keycode)
+       
+        if keycode == 'W':
+            self.target_l[1] += self.delta
+            print(f" Moving left target forward")
+        elif keycode == 'S':
+            print(f"self.target_l[1]: {self.target_l[1]}")
+            self.target_l[1] -= self.delta
+            print(f" Moving left target backward")
+            print(f"new self.target_l[1]: {self.target_l[1]}")
+        elif keycode == 'A':
+            self.target_l[0] -= self.delta
+            print(f" Moving left target left")
+        elif keycode == 'D':
+            self.target_l[0] += self.delta
+            print(f" Moving left target right")
+        elif keycode == 'Q':
+            self.target_l[2] += self.delta
+            print(f" Moving left target up")
+        elif keycode == 'E':
+            self.target_l[2] -= self.delta
+            print(f" Moving left target down")
+
+        elif keycode == 'I':
+            self.target_r[1] += self.delta
+            print(f" Moving right target forward")
+        elif keycode == 'K':
+            self.target_r[1] -= self.delta
+            print(f" Moving right target backward")
+        elif keycode == 'J':
+            self.target_r[0] -= self.delta
+            print(f" Moving right target left")
+        elif keycode == 'L':
+            self.target_r[0] += self.delta
+            print(f" Moving right target right")
+        elif keycode == 'U':
+            self.target_r[2] += self.delta
+            print(f" Moving right target up")
+        elif keycode == 'O':
+            self.target_r[2] -= self.delta
+            print(f" Moving right target down")
+        
+        elif keycode == 'X':
+            # print(f"pre gripper positions: {self.left_gripper_pos}, {self.right_gripper_pos}")
+            # self.left_gripper_pos += self.delta / 50
+            # self.right_gripper_pos += self.delta / 50
+            # print(f"new gripper positions: {self.left_gripper_pos}, {self.right_gripper_pos}")
+            self.left_gripper_pos = 0.037
+            self.right_gripper_pos = 0.037
+            print(f" Opening gripper")
+        elif keycode == 'Z':    
+            # print(f"pre gripper positions: {self.left_gripper_pos}, {self.right_gripper_pos}")
+            # self.left_gripper_pos -= self.delta / 50
+            # self.right_gripper_pos -= self.delta / 50
+            # print(f"new gripper positions: {self.left_gripper_pos}, {self.right_gripper_pos}")
+            self.left_gripper_pos = 0.002
+            self.right_gripper_pos = 0.002
+            print(f" Closing gripper")
+
+        #TODO: change rotations in each dimension
+        
+        elif keycode == 'R':
+            self.update_rotation('x', rotation_angle)
+            print(f"Rotating around X axis")
+        elif keycode == 'T':
+            self.update_rotation('x', -rotation_angle)
+            print(f"Rotating around X axis (reverse)")
+        elif keycode == 'F':
+            self.update_rotation('y', rotation_angle)
+            print(f"Rotating around Y axis")
+        elif keycode == 'G':
+            self.update_rotation('y', -rotation_angle)
+            print(f"Rotating around Y axis (reverse)")
+        elif keycode == 'V':
+            self.update_rotation('z', rotation_angle)
+            print(f"Rotating around Z axis")
+        elif keycode == 'B':
+            self.update_rotation('z', -rotation_angle)
+            print(f"Rotating around Z axis (reverse)")
+        
+        self.target_l = np.clip(self.target_l, [self.x_min, self.y_min, self.z_min], [self.x_max, self.y_max, self.z_max])
+        self.target_r = np.clip(self.target_r, [self.x_min, self.y_min, self.z_min], [self.x_max, self.y_max, self.z_max])
+
+        self.left_gripper_pos = np.clip(self.left_gripper_pos, 0.02, 0.037)
+        self.right_gripper_pos = np.clip(self.right_gripper_pos, 0.02, 0.037)
+
+        self.targets_updated = True
 
     def control_gripper(self, left_gripper_position, right_gripper_position):
         # Args: gripper_position (float): A value between 0.002 (closed) and 0.037 (open).
-        left_gripper_position = np.clip(left_gripper_position, 0.002, 0.037)
-        right_gripper_position = np.clip(right_gripper_position, 0.002, 0.037)
+        left_gripper_position = np.clip(left_gripper_position, 0.02, 0.037)
+        right_gripper_position = np.clip(right_gripper_position, 0.02, 0.037)
         self.data.ctrl[self.left_gripper_actuator_id] = left_gripper_position
         self.data.ctrl[self.right_gripper_actuator_id] = right_gripper_position
         
@@ -86,11 +202,11 @@ class AlohaMocapControl:
 
         self.target_l[0] = np.clip(self.target_l[0], self.x_min, self.x_max)
         self.target_l[1] = np.clip(self.target_l[1], self.y_min, self.y_max)
-        self.left_gripper_pos = np.clip(self.left_gripper_pos, 0.002, 0.037)
-        self.right_gripper_pos = np.clip(self.right_gripper_pos, 0.002, 0.037)
+        self.left_gripper_pos = np.clip(self.left_gripper_pos, 0.02, 0.037)
+        self.right_gripper_pos = np.clip(self.right_gripper_pos, 0.02, 0.037)
 
         self.targets_updated = True
-        print(f"New target_l x position: {self.target_l[0]}")
+        # print(f"New target_l x position: {self.target_l[0]}")
 
     def on_click(self, x, y, button, pressed):
         if pressed:
@@ -102,7 +218,7 @@ class AlohaMocapControl:
             self.target_l[2] = np.clip(self.target_l[2], self.z_min, self.z_max)
 
             self.targets_updated = True
-            print(f"New target_l z position: {self.target_l[2]}")
+            # print(f"New target_l z position: {self.target_l[2]}")
     
     def run(self):
         model = self.model
@@ -165,8 +281,11 @@ class AlohaMocapControl:
         max_iters = 20
 
         with mujoco.viewer.launch_passive(
-            model=model, data=data, show_left_ui=False, show_right_ui=False
+            model=model, data=data, show_left_ui=False, show_right_ui=False, key_callback=self.keyboard_callback
         ) as viewer:
+
+            # viewer._loop.thread._window.set_key_callback(self.keyboard_callback)
+            
             mujoco.mjv_defaultFreeCamera(model, viewer.cam)
 
             self.add_target_sites()
@@ -184,9 +303,10 @@ class AlohaMocapControl:
                 if self.targets_updated:
                     l_target_pose = mink.SE3.from_rotation_and_translation(self.rot_l, self.target_l)
                     l_ee_task.set_target(l_target_pose)
+                    r_target_pose = mink.SE3.from_rotation_and_translation(self.rot_r, self.target_r)
+                    r_ee_task.set_target(r_target_pose)
 
                     self.update_target_sites(self.target_l, self.target_r, self.rot_l, self.rot_r)
-
                     self.targets_updated = False
 
                 for _ in range(max_iters):
@@ -199,7 +319,15 @@ class AlohaMocapControl:
                         damping=1e-3,
                     )
 
-                    right_vel = np.zeros_like(right_configuration.dq)
+                    # right_vel = np.zeros_like(right_configuration.dq)
+                    right_vel = mink.solve_ik(
+                        right_configuration,
+                        [r_ee_task],
+                        rate.dt,
+                        solver,
+                        limits=limits,
+                        damping=1e-3,
+                    )
 
                     left_configuration.integrate_inplace(left_vel, rate.dt)
                     right_configuration.integrate_inplace(right_vel, rate.dt)
@@ -214,7 +342,7 @@ class AlohaMocapControl:
                     data.ctrl[right_actuator_ids] = right_configuration.q
 
                     self.control_gripper(self.left_gripper_pos, self.right_gripper_pos)
-                    print(f"self.left_gripper_pos: {self.left_gripper_pos}, self.right_gripper_pos: {self.right_gripper_pos}")
+                    # print(f"self.left_gripper_pos: {self.left_gripper_pos}, self.right_gripper_pos: {self.right_gripper_pos}")
 
                     mujoco.mj_step(model, data)
 
