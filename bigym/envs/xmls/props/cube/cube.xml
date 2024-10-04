@@ -8,7 +8,7 @@
   </default>
   <worldbody>
     <body name="cube" childclass="cube">
-      <geom name="mesh" type="box" size="0.025 0.025 0.025" solimp="0.95 0.98 0.001" solref="0.004 1" rgba="1 0 0 1"/>
+      <geom name="mesh" type="box" size="0.025 0.025 0.025" solimp="0.95 0.98 0.001" solref="0.004 1" rgba="1 0 0 1" mass="100"/>
     </body>
   </worldbody>
 </mujoco>

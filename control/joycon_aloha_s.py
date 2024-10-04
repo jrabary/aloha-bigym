@@ -50,15 +50,24 @@ class AlohaMocapControl:
         self.model = self.env.unwrapped._mojo.model
         self.data = self.env.unwrapped._mojo.data
 
-        self.target_l = np.array([-0.25, 0.0, 1.1])
-        self.target_r = np.array([0.25, 0.0, 1.1])
+        self.target_l = np.array([-0.4, 0.5, 1.1])
+        self.target_r = np.array([0.4, 0.5, 1.1])
         self.rot_l = SO3.identity()
         self.rot_r = SO3.from_matrix(-np.eye(3))
+
+        #rotate l and r 90 degrees in horizontal plane to face away from camera
+        self.update_rotation('z', np.pi/2, 'left')
+        self.update_rotation('z', -np.pi/2, 'right')
+
+        #rotate l and r 90 degrees in the y axis to orient the gripper horizontal to the ground
+        self.update_rotation('y', np.pi/2, 'left')
+        self.update_rotation('y', np.pi/2, 'right')
+
         self.targets_updated = False  
 
-        self.x_min, self.x_max = -0.4, 0.4
-        self.y_min, self.y_max = -0.4, 0.4
-        self.z_min, self.z_max = 0.8, 1.4
+        self.x_min, self.x_max = -0.6, 0.6
+        self.y_min, self.y_max = -0.6, 0.6
+        self.z_min, self.z_max = 0.78, 1.6
 
         self.left_gripper_actuator_id = self.model.actuator("aloha_scene/aloha_gripper_left/gripper_actuator").id
         self.right_gripper_actuator_id = self.model.actuator("aloha_scene/aloha_gripper_right/gripper_actuator").id
@@ -66,12 +75,6 @@ class AlohaMocapControl:
         self.right_gripper_pos = 0.037
 
         self.dt = 1/60
-
-        self.accel_filter_alpha = 0.8 # 0-1 (1 is peak filter)
-        self.previous_accel_l = np.zeros(3)
-        self.previous_filtered_accel_l = np.zeros(3)
-        self.previous_accel_r = np.zeros(3)
-        self.previous_filtered_accel_r = np.zeros(3)
 
         self.gravity_magnitude_right = 0
         self.gravity_magnitude_left = 0
@@ -128,20 +131,7 @@ class AlohaMocapControl:
         else:
             self.rot_r = self.apply_rotation(self.rot_r, rotation_change)
         self.targets_updated = True
-
-    def accel_to_translation_matrix(self, accel, dt):
-        translation = (accel * dt**2) / 2
-        translation_matrix = np.eye(4)
-        translation_matrix[:3, 3] = translation
-        return translation_matrix
     
-    def high_pass_filter(self, old_value, new_value, old_filtered, alpha):
-        return alpha * (new_value - old_value + old_filtered)
-    
-    def compensate_gravity(self, accel_vec, rotation, gravity_magnitude):
-        gravity_local = rotation.apply(np.array([0, 0, self.gravity_magnitude_left]))
-        return accel_vec - gravity_local
-
     def joycon_control_l(self):
         status = self.joycon_L.get_status()
         rotation = status['gyro']
@@ -164,8 +154,8 @@ class AlohaMocapControl:
         self.target_l = np.clip(self.target_l, [self.x_min, self.y_min, self.z_min], [self.x_max, self.y_max, self.z_max])
 
         #rotation
-        self.update_rotation('x', rotation['x'] * 0.0001, 'left')
-        self.update_rotation('y', rotation['y'] * 0.0001, 'left')
+        self.update_rotation('x', -rotation['y'] * 0.0001, 'left')
+        self.update_rotation('y', rotation['x'] * 0.0001, 'left')
         self.update_rotation('z', rotation['z'] * 0.0001, 'left')
 
         #gripper
@@ -197,9 +187,9 @@ class AlohaMocapControl:
         self.target_r = np.clip(self.target_r, [self.x_min, self.y_min, self.z_min], [self.x_max, self.y_max, self.z_max])
 
         #rotation
-        self.update_rotation('x', rotation['x'] * 0.0001, 'right')
-        self.update_rotation('y', rotation['y'] * 0.0001, 'right')
-        self.update_rotation('z', rotation['z'] * 0.0001, 'right')
+        self.update_rotation('x', rotation['y'] * 0.0001, 'right')
+        self.update_rotation('y', rotation['x'] * 0.0001, 'right')
+        self.update_rotation('z', -rotation['z'] * 0.0001, 'right')
 
         #gripper
         if up == 1: 
@@ -311,7 +301,7 @@ class AlohaMocapControl:
                         rate.dt,
                         solver,
                         limits=limits,
-                        damping=1e-3,
+                        damping=1e-1,
                     )
 
                     # right_vel = np.zeros_like(right_configuration.dq)
@@ -321,7 +311,7 @@ class AlohaMocapControl:
                         rate.dt,
                         solver,
                         limits=limits,
-                        damping=1e-3,
+                        damping=1e-1,
                     )
 
                     left_configuration.integrate_inplace(left_vel, rate.dt)
