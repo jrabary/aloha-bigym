@@ -247,8 +247,8 @@
       </body>
     </body>
 
-    <site name="target" pos="0 0 1" size="0.05" rgba="1 0 0 1"/>
-    <site name="target2" pos="0 0 1" size="0.05" rgba="1 1 1 1"/>
+    <site name="target" pos="0 0 1" size="0.05" rgba="1 1 1 0"/>
+    <site name="target2" pos="0 0 1" size="0.05" rgba="1 1 1 0"/>
 
   </worldbody>
 
