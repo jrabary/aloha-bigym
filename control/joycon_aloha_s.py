@@ -13,9 +13,6 @@ from mink import SO3
 
 from reduced_configuration import ReducedConfiguration
 from loop_rate_limiters import RateLimiter
-import threading
-# from pynput import mouse  
-import glfw
 from pyjoycon import JoyCon, get_R_id, get_L_id
 import time
 
