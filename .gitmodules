@@ -1,0 +1,3 @@
+[submodule "models/act-bigym-aloha"]
+	path = models/act-bigym-aloha
+	url = https://github.com/AlmondGod/act-bigym-aloha.git
