@@ -65,9 +65,12 @@ No longer relevant: `PickBox`, `GroceriesStoreLower`, `CupboardsOpenAll`, `Cupbo
 # Install
 
 ```bash
+git clone https://github.com/AlmondGod/aloha-bigym/tree/master
+cd aloha-bigym
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install .
+git submodule update --init --recursive
 ```
 
 - If you encounter this error: `ImportError: cannot import name 'MujocoElement' from 'mojo.elements'`, add this line: 
