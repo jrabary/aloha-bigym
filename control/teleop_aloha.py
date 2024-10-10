@@ -12,6 +12,7 @@ from mink import SO3
 from reduced_configuration import ReducedConfiguration
 from loop_rate_limiters import RateLimiter
 from pyjoycon import JoyCon, get_R_id, get_L_id
+import os
 
 _JOINT_NAMES = [
     "waist",
@@ -73,79 +74,80 @@ class AlohaMocapControl:
         self.left_gripper_pos = 0.037
         self.right_gripper_pos = 0.037
 
-        self.dt = 1/60
-
-        self.gravity_magnitude_right = 0
-        self.gravity_magnitude_left = 0
-
         self.calibrate()
 
         self.initialize_hdf5_storage()
 
+        self.action = np.zeros(14)
+
     def initialize_hdf5_storage(self):
-        self.hdf5_file = h5py.File('robot_data.hdf5', 'w')
-
-        self.num_qpos = len(self.data.qpos)
-        self.num_qvel = len(self.data.qvel)
-
-        # qpos and qvel
-        self.qpos_dataset = self.hdf5_file.create_dataset(
-            'joint_data/qpos', (0, self.num_qpos), maxshape=(None, self.num_qpos), chunks=(1, self.num_qpos))
-        self.qvel_dataset = self.hdf5_file.create_dataset(
-            'joint_data/qvel', (0, self.num_qvel), maxshape=(None, self.num_qvel), chunks=(1, self.num_qvel))
+        # each time this file is run the name of the dataset should be the next number compared with the highest episode number already in the dataset directory
+        # stop collecting data and save the data when ctrl c called
+        # each episode has its own file
         
-        # target action data (rotations, translations, gripper pos)
-        self.action_dataset = {
-            'rot_l': self.hdf5_file.create_dataset(
-                'action_data/rot_l', (0, 3, 3), maxshape=(None, 3, 3), chunks=True),
-            'rot_r': self.hdf5_file.create_dataset(
-                'action_data/rot_r', (0, 3, 3), maxshape=(None, 3, 3), chunks=True),
-            'target_l': self.hdf5_file.create_dataset(
-                'action_data/target_l', (0, 3), maxshape=(None, 3), chunks=True),
-            'target_r': self.hdf5_file.create_dataset(
-                'action_data/target_r', (0, 3), maxshape=(None, 3), chunks=True),
-            'left_gripper_pos': self.hdf5_file.create_dataset(
-                'action_data/left_gripper_pos', (0,), maxshape=(None,), chunks=True),
-            'right_gripper_pos': self.hdf5_file.create_dataset(
-                'action_data/right_gripper_pos', (0,), maxshape=(None,), chunks=True)
+        self.dataset_dir = 'data'
+        self.hdf5_file = h5py.File(f'{self.dataset_dir}/episode_0.hdf5', 'w') #manually set
+
+        self.data_dict = {
+            '/observations/qpos': [],
+            '/observations/qvel': [],
+            '/action': [],
         }
 
-        # camera data (compressed)
-        self.camera_feeds = {}
-        for cam_name in ['wrist_cam_left', 'wrist_cam_right', 'overhead_cam', 'teleoperator_pov']:
-            self.camera_feeds[cam_name] = self.hdf5_file.create_dataset(
-                f'camera_feeds/{cam_name}', (0, 720, 1280, 3), maxshape=(None, 720, 1280, 3),
-                compression='gzip', compression_opts=9, chunks=(1, 720, 1280, 3))
+        self.camera_names = ['wrist_cam_left', 'wrist_cam_right', 'overhead_cam', 'teleoperator_pov']
+
+        for cam_name in self.camera_names:
+            self.data_dict[f'/observations/images/{cam_name}'] = []
 
     def store_data(self):
-        """Append new timestep data to HDF5."""
-        # joint pos and vel
-        self.qpos_dataset.resize(self.qpos_dataset.shape[0] + 1, axis=0)
-        self.qvel_dataset.resize(self.qvel_dataset.shape[0] + 1, axis=0)
-        self.qpos_dataset[-1, :] = self.data.qpos.copy()
-        self.qvel_dataset[-1, :] = self.data.qvel.copy()
+        # at each timestep append current data to data_dict
+        self.data_dict['/observations/qpos'].append(self.get_qpos())
+        self.data_dict['/observations/qvel'].append(self.get_qvel())
+        self.data_dict['/action'].append(self.get_action())
+        for cam_name in self.camera_names:
+            self.data_dict[f'/observations/images/{cam_name}'].append(self.get_obs(cam_name))
 
-        # target action 
-        for key, value in self.action_dataset.items():
-            value.resize(value.shape[0] + 1, axis=0)
-            if key == 'rot_l':
-                value[-1] = self.rot_l.as_matrix()
-            elif key == 'rot_r':
-                value[-1] = self.rot_r.as_matrix()
-            elif key == 'target_l':
-                value[-1] = self.target_l.copy()
-            elif key == 'target_r':
-                value[-1] = self.target_r.copy()
-            elif key == 'left_gripper_pos':
-                value[-1] = self.left_gripper_pos
-            elif key == 'right_gripper_pos':
-                value[-1] = self.right_gripper_pos
+    def get_qpos(self):
+        print(f"qpos: {self.data.qpos}, len qpos: {len(self.data.qpos)}")
+        return self.data.qpos.copy()
+        
+    def get_qvel(self):
+        print(f"qvel: {self.data.qvel}, len qvel: {len(self.data.qvel)}")
+        return self.data.qvel.copy()
+    
+    def get_action(self):
+        return self.action.copy()
+        
+    def get_obs(self, cam_name):
+        renderer, cam_id = self.camera_renderers[cam_name]
+        renderer.update_scene(self.data, cam_id)
+        img = renderer.render()
+        return img
 
-        # 4 cameras (left wrist, right wrist, overhead, teleop pov)
-        for cam_name, (renderer, cam_id) in self.camera_renderers.items():
-            renderer.update_scene(self.data, cam_id)
-            img = renderer.render()
-            self.camera_feeds[cam_name] = img
+    def final_save(self):
+        episode_idx = 0
+        max_timesteps = 1000
+
+        # straight from Tony Zhao ACT record_sim_episodes.py
+        # HDF5
+        t0 = time.time()
+        dataset_path = os.path.join(self.dataset_dir, f'episode_{episode_idx}')
+        with h5py.File(dataset_path + '.hdf5', 'w', rdcc_nbytes=1024 ** 2 * 2) as root:
+            root.attrs['sim'] = True
+            obs = root.create_group('observations')
+            image = obs.create_group('images')
+            for cam_name in self.camera_names:
+                _ = image.create_dataset(cam_name, (max_timesteps, 480, 640, 3), dtype='uint8',
+                                         chunks=(1, 480, 640, 3), )
+            # compression='gzip',compression_opts=2,)
+            # compression=32001, compression_opts=(0, 0, 0, 0, 9, 1, 1), shuffle=False)
+            qpos = obs.create_dataset('qpos', (max_timesteps, 14))
+            qvel = obs.create_dataset('qvel', (max_timesteps, 14))
+            action = root.create_dataset('action', (max_timesteps, 14))
+
+            for name, array in self.data_dict.items():
+                root[name][...] = array
+        print(f'Saving: {time.time() - t0:.1f} secs\n')
 
     def calibrate(self):
         num_samples = 100
@@ -167,9 +169,6 @@ class AlohaMocapControl:
         
         self.right_calibration_offset = np.mean(right_samples, axis=0)
         self.left_calibration_offset = np.mean(left_samples, axis=0)
-
-        self.gravity_magnitude_right = self.right_calibration_offset[2] 
-        self.gravity_magnitude_left = self.left_calibration_offset[2] 
 
     def so3_to_matrix(self, so3_rotation: SO3) -> np.ndarray:
         return so3_rotation.as_matrix()
@@ -207,27 +206,27 @@ class AlohaMocapControl:
         up = status['buttons']['left']['up']
         down = status['buttons']['left']['down']
 
-        #translation
-        if button_lower == 1:
-            self.target_l[2] -= 0.03
-        elif button_higher == 1:
-            self.target_l[2] += 0.03
+        self.action[0] = (joystick['horizontal'] - self.left_calibration_offset[6]) * 0.00005
+        self.action[1] = (joystick['vertical'] - self.left_calibration_offset[7]) * 0.00005
+        self.action[2] = -0.03 if button_lower == 1 else 0.03 if button_higher == 1 else 0
+        self.action[3] = -rotation['y'] * 0.0001
+        self.action[4] = rotation['x'] * 0.0001
+        self.action[5] = rotation['z'] * 0.0001
+        self.action[6] = 0.037 if up == 1 else 0.002 if down == 1 else 0
 
-        self.target_l[0] += (joystick['horizontal'] - self.left_calibration_offset[6]) * 0.00005
-        self.target_l[1] += (joystick['vertical'] - self.left_calibration_offset[7]) * 0.00005
+        self.target_l[0] += self.action[0]
+        self.target_l[1] += self.action[1]
+        self.target_l[2] += self.action[2]
 
         self.target_l = np.clip(self.target_l, [self.x_min, self.y_min, self.z_min], [self.x_max, self.y_max, self.z_max])
 
         #rotation
-        self.update_rotation('x', -rotation['y'] * 0.0001, 'left')
-        self.update_rotation('y', rotation['x'] * 0.0001, 'left')
-        self.update_rotation('z', rotation['z'] * 0.0001, 'left')
+        self.update_rotation('x', self.action[3], 'left')
+        self.update_rotation('y', self.action[4], 'left')
+        self.update_rotation('z', self.action[5], 'left')
 
         #gripper
-        if up == 1:
-            self.left_gripper_pos = 0.037
-        elif down == 1:
-            self.left_gripper_pos = 0.002
+        self.left_gripper_pos = self.action[6]
         self.targets_updated = True
 
     def joycon_control_r(self):
@@ -239,27 +238,27 @@ class AlohaMocapControl:
         up = status['buttons']['right']['x']
         down = status['buttons']['right']['b']
 
-        #translation
-        if button_higher == 1:
-            self.target_r[2] += 0.03
-        elif button_lower == 1:
-            self.target_r[2] -= 0.03
+        self.action[7] = (joystick['horizontal'] - self.right_calibration_offset[6]) * 0.00005
+        self.action[8] = (joystick['vertical'] - self.right_calibration_offset[7]) * 0.00005
+        self.action[9] = -0.03 if button_lower == 1 else 0.03 if button_higher == 1 else 0
+        self.action[10] = rotation['y'] * 0.0001
+        self.action[11] = rotation['x'] * 0.0001
+        self.action[12] = -rotation['z'] * 0.0001
+        self.action[13] = 0.037 if up == 1 else 0.002 if down == 1 else 0
 
-        self.target_r[0] += (joystick['horizontal'] - self.right_calibration_offset[6]) * 0.00005
-        self.target_r[1] += (joystick['vertical'] - self.right_calibration_offset[7]) * 0.00005
+        self.target_r[0] += self.action[7]
+        self.target_r[1] += self.action[8]
+        self.target_r[2] += self.action[9]
 
         self.target_r = np.clip(self.target_r, [self.x_min, self.y_min, self.z_min], [self.x_max, self.y_max, self.z_max])
 
         #rotation
-        self.update_rotation('x', rotation['y'] * 0.0001, 'right')
-        self.update_rotation('y', rotation['x'] * 0.0001, 'right')
-        self.update_rotation('z', -rotation['z'] * 0.0001, 'right')
+        self.update_rotation('x', self.action[10], 'right')
+        self.update_rotation('y', self.action[11], 'right')
+        self.update_rotation('z', self.action[12], 'right')
 
         #gripper
-        if up == 1: 
-            self.right_gripper_pos = 0.0037
-        elif down == 1:
-            self.right_gripper_pos = 0.002
+        self.right_gripper_pos = self.action[13]
         self.targets_updated = True
 
     def control_gripper(self, left_gripper_position, right_gripper_position):
@@ -344,88 +343,92 @@ class AlohaMocapControl:
         solver = "osqp"
         max_iters = 20
 
-        with mujoco.viewer.launch_passive(
-            model=model, data=data, show_left_ui=True, show_right_ui=False
-        ) as viewer:
-            mujoco.mjv_defaultFreeCamera(model, viewer.cam)
+        try:
+            with mujoco.viewer.launch_passive(
+                model=model, data=data, show_left_ui=True, show_right_ui=False
+            ) as viewer:
+                mujoco.mjv_defaultFreeCamera(model, viewer.cam)
 
-            self.add_target_sites()
-            mujoco.mj_forward(model, data)
+                self.add_target_sites()
+                mujoco.mj_forward(model, data)
 
-            l_target_pose = mink.SE3.from_rotation_and_translation(self.rot_l, self.target_l)
-            r_target_pose = mink.SE3.from_rotation_and_translation(self.rot_r, self.target_r)
+                l_target_pose = mink.SE3.from_rotation_and_translation(self.rot_l, self.target_l)
+                r_target_pose = mink.SE3.from_rotation_and_translation(self.rot_r, self.target_r)
 
-            l_ee_task.set_target(l_target_pose)
-            r_ee_task.set_target(r_target_pose)
+                l_ee_task.set_target(l_target_pose)
+                r_ee_task.set_target(r_target_pose)
 
-            sim_rate = RateLimiter(frequency=200.0) 
+                sim_rate = RateLimiter(frequency=200.0) 
 
-            # currently recording data at 50Hz (same as in paper)
-            data_recording_interval = 0.02  # 1 / Hz
-            last_data_record_time = time.time()
+                # data recording should be 50hz, 
+                # loop is currently 200hz, thus record every 4th loop
+                data_recording_interval = 4
 
-            while viewer.is_running():
-                self.joycon_control_l()
-                self.joycon_control_r()
-
-                self.control_gripper(self.left_gripper_pos, self.right_gripper_pos)
-                if self.targets_updated:
-                    l_target_pose = mink.SE3.from_rotation_and_translation(self.rot_l, self.target_l)
-                    l_ee_task.set_target(l_target_pose)
-                    r_target_pose = mink.SE3.from_rotation_and_translation(self.rot_r, self.target_r)
-                    r_ee_task.set_target(r_target_pose)
-
-                    self.update_target_sites(self.target_l, self.target_r, self.rot_l, self.rot_r)
-                    self.targets_updated = False
-
-                for _ in range(max_iters):
-                    left_vel = mink.solve_ik(
-                        left_configuration,
-                        [l_ee_task],
-                        sim_rate.dt,
-                        solver,
-                        limits=limits,
-                        damping=1e-1,
-                    )
-
-                    right_vel = mink.solve_ik(
-                        right_configuration,
-                        [r_ee_task],
-                        sim_rate.dt,
-                        solver,
-                        limits=limits,
-                        damping=1e-1,
-                    )
-
-                    left_configuration.integrate_inplace(left_vel, sim_rate.dt)
-                    right_configuration.integrate_inplace(right_vel, sim_rate.dt)
-
-                    data.qpos[left_relevant_qpos_indices] = left_configuration.q
-                    data.qpos[right_relevant_qpos_indices] = right_configuration.q
-
-                    data.qvel[left_relevant_qvel_indices] = left_configuration.dq
-                    data.qvel[right_relevant_qvel_indices] = right_configuration.dq
-
-                    data.ctrl[left_actuator_ids] = left_configuration.q
-                    data.ctrl[right_actuator_ids] = right_configuration.q
+                while viewer.is_running():
+                    self.joycon_control_l()
+                    self.joycon_control_r()
 
                     self.control_gripper(self.left_gripper_pos, self.right_gripper_pos)
+                    if self.targets_updated:
+                        l_target_pose = mink.SE3.from_rotation_and_translation(self.rot_l, self.target_l)
+                        l_ee_task.set_target(l_target_pose)
+                        r_target_pose = mink.SE3.from_rotation_and_translation(self.rot_r, self.target_r)
+                        r_ee_task.set_target(r_target_pose)
 
-                    mujoco.mj_step(model, data)
+                        self.update_target_sites(self.target_l, self.target_r, self.rot_l, self.rot_r)
+                        self.targets_updated = False
 
-                    viewer.sync()
-                    sim_rate.sleep()
+                    for _ in range(max_iters):
+                        left_vel = mink.solve_ik(
+                            left_configuration,
+                            [l_ee_task],
+                            sim_rate.dt,
+                            solver,
+                            limits=limits,
+                            damping=1e-1,
+                        )
 
-                # current_time = time.time()
-                # if current_time - last_data_record_time >= data_recording_interval:
-                #     self.store_data()
-                #     print(f"qpos shape: {self.data.qpos.shape}, dataset shape: {self.qpos_dataset.shape}")
-                #     print(f"qvel shape: {self.data.qvel.shape}, dataset shape: {self.qvel_dataset.shape}")
-                #     last_data_record_time = current_time
+                        right_vel = mink.solve_ik(
+                            right_configuration,
+                            [r_ee_task],
+                            sim_rate.dt,
+                            solver,
+                            limits=limits,
+                            damping=1e-1,
+                        )
 
-        self.close()
+                        left_configuration.integrate_inplace(left_vel, sim_rate.dt)
+                        right_configuration.integrate_inplace(right_vel, sim_rate.dt)
+
+                        data.qpos[left_relevant_qpos_indices] = left_configuration.q
+                        data.qpos[right_relevant_qpos_indices] = right_configuration.q
+
+                        data.qvel[left_relevant_qvel_indices] = left_configuration.dq
+                        data.qvel[right_relevant_qvel_indices] = right_configuration.dq
+
+                        data.ctrl[left_actuator_ids] = left_configuration.q
+                        data.ctrl[right_actuator_ids] = right_configuration.q
+
+                        self.control_gripper(self.left_gripper_pos, self.right_gripper_pos)
+
+                        mujoco.mj_step(model, data)
+
+                        iters += 1
+                        if iters == data_recording_interval:
+                            self.store_data()
+                            iters = 0
+
+                        viewer.sync()
+                        sim_rate.sleep()
+                    
+        except KeyboardInterrupt:
+            pass
+        finally:
+            self.close()
 
     def close(self):
+        # if ctrl+c is called (currently only way to end this), call self.final_save() to save the data
+        self.final_save()
         self.hdf5_file.close()
         for renderer, _ in self.camera_renderers.values():
             renderer.close()
