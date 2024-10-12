@@ -34,10 +34,10 @@ class AlohaMocapControl:
             action_mode=AlohaPositionActionMode(floating_base=False, absolute=False, control_all_joints=True),
             observation_config=ObservationConfig(
                 cameras=[
-                    CameraConfig(name="wrist_cam_left", rgb=True, depth=False, resolution=(1280, 720)),
-                    CameraConfig(name="wrist_cam_right", rgb=True, depth=False, resolution=(1280, 720)),
-                    CameraConfig(name="overhead_cam", rgb=True, depth=False, resolution=(1280, 720)),
-                    CameraConfig(name="teleoperator_pov", rgb=True, depth=False, resolution=(1280, 720)),
+                    CameraConfig(name="wrist_cam_left", rgb=True, depth=False, resolution=(480, 640)),
+                    CameraConfig(name="wrist_cam_right", rgb=True, depth=False, resolution=(480, 640)),
+                    CameraConfig(name="overhead_cam", rgb=True, depth=False, resolution=(480, 640)),
+                    CameraConfig(name="teleoperator_pov", rgb=True, depth=False, resolution=(480, 640)),
                 ],
             ),
             render_mode="human",
@@ -74,6 +74,8 @@ class AlohaMocapControl:
         self.left_gripper_pos = 0.037
         self.right_gripper_pos = 0.037
 
+        self.num_timesteps = 0
+
         self.calibrate()
 
         self.initialize_hdf5_storage()
@@ -83,10 +85,9 @@ class AlohaMocapControl:
     def initialize_hdf5_storage(self):
         # each time this file is run the name of the dataset should be the next number compared with the highest episode number already in the dataset directory
         # stop collecting data and save the data when ctrl c called
-        # each episode has its own file
+        # each episode has its own file (this is to fit with the ACT data format)
         
         self.dataset_dir = 'data'
-        self.hdf5_file = h5py.File(f'{self.dataset_dir}/episode_0.hdf5', 'w') #manually set
 
         self.data_dict = {
             '/observations/qpos': [],
@@ -107,13 +108,18 @@ class AlohaMocapControl:
         for cam_name in self.camera_names:
             self.data_dict[f'/observations/images/{cam_name}'].append(self.get_obs(cam_name))
 
+        self.num_timesteps += 1
+
     def get_qpos(self):
-        print(f"qpos: {self.data.qpos}, len qpos: {len(self.data.qpos)}")
-        return self.data.qpos.copy()
+        qpos = np.concatenate((self.lstore, [self.left_gripper_pos], self.rstore, [self.right_gripper_pos]), axis=0)
+        # print(f"len qpos: {len(qpos)}")
+        return qpos
         
     def get_qvel(self):
-        print(f"qvel: {self.data.qvel}, len qvel: {len(self.data.qvel)}")
-        return self.data.qvel.copy()
+        left_gripper_vel = 1 if self.action[6] > 0 else -1 if self.action[6] < 0 else 0
+        right_gripper_vel = 1 if self.action[13] > 0 else -1 if self.action[13] < 0 else 0
+        qvel = np.concatenate((self.lvelstore, [left_gripper_vel], self.rvelstore, [right_gripper_vel]), axis=0)
+        return qvel
     
     def get_action(self):
         return self.action.copy()
@@ -126,7 +132,6 @@ class AlohaMocapControl:
 
     def final_save(self):
         episode_idx = 0
-        max_timesteps = 1000
 
         # straight from Tony Zhao ACT record_sim_episodes.py
         # HDF5
@@ -136,17 +141,46 @@ class AlohaMocapControl:
             root.attrs['sim'] = True
             obs = root.create_group('observations')
             image = obs.create_group('images')
+
+            right_w_len = 0
+            left_w_len = 0
+            overhead_len = 0
+            teleop_len = 0
+
+            for name, array in self.data_dict.items():
+                if "observations" in name:
+                    if "left" in name:
+                        left_w_len = len(array)
+                    elif "right" in name:
+                        right_w_len = len(array)
+                    elif "overhead" in name:
+                        overhead_len = len(array)
+                    elif "teleop" in name:
+                        teleop_len = len(array)
+
             for cam_name in self.camera_names:
-                _ = image.create_dataset(cam_name, (max_timesteps, 480, 640, 3), dtype='uint8',
+                if cam_name == 'wrist_cam_left':
+                    cam_len = left_w_len
+                elif cam_name == 'wrist_cam_right':
+                    cam_len = right_w_len
+                elif cam_name == 'overhead_cam':
+                    cam_len = overhead_len
+                elif cam_name == 'teleoperator_pov':
+                    cam_len = teleop_len
+                
+                _ = image.create_dataset(cam_name, (cam_len, 480, 640, 3), dtype='uint8',
                                          chunks=(1, 480, 640, 3), )
             # compression='gzip',compression_opts=2,)
             # compression=32001, compression_opts=(0, 0, 0, 0, 9, 1, 1), shuffle=False)
-            qpos = obs.create_dataset('qpos', (max_timesteps, 14))
-            qvel = obs.create_dataset('qvel', (max_timesteps, 14))
-            action = root.create_dataset('action', (max_timesteps, 14))
+            qpos = obs.create_dataset('qpos', (self.num_timesteps + 1, 14))
+            qvel = obs.create_dataset('qvel', (self.num_timesteps + 1, 14))
+            action = root.create_dataset('action', (self.num_timesteps + 1, 14))
 
             for name, array in self.data_dict.items():
+                print(f"shape of {name}: {np.array(array).shape}")
+                print(f"root[name]: {root[name]}")
                 root[name][...] = array
+
         print(f'Saving: {time.time() - t0:.1f} secs\n')
 
     def calibrate(self):
@@ -306,11 +340,16 @@ class AlohaMocapControl:
         left_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in left_joint_names])
         left_configuration = ReducedConfiguration(model, data, left_relevant_qpos_indices, left_relevant_qvel_indices)
 
+        self.lstore = left_relevant_qpos_indices
+        self.lvelstore = left_relevant_qvel_indices
+
         right_dof_ids = np.array([model.joint(name).id for name in right_joint_names])
         right_actuator_ids = np.array([model.actuator(name).id for name in right_joint_names])
         right_relevant_qpos_indices = np.array([model.jnt_qposadr[model.joint(name).id] for name in right_joint_names])
         right_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in right_joint_names])
         right_configuration = ReducedConfiguration(model, data, right_relevant_qpos_indices, right_relevant_qvel_indices)
+        self.rstore = right_relevant_qpos_indices
+        self.rvelstore = right_relevant_qvel_indices
 
         l_ee_task = mink.FrameTask(
                 frame_name="aloha_scene/left_gripper",
@@ -363,7 +402,7 @@ class AlohaMocapControl:
                 # data recording should be 50hz, 
                 # loop is currently 200hz, thus record every 4th loop
                 data_recording_interval = 4
-
+                iters = 0
                 while viewer.is_running():
                     self.joycon_control_l()
                     self.joycon_control_r()
@@ -429,7 +468,6 @@ class AlohaMocapControl:
     def close(self):
         # if ctrl+c is called (currently only way to end this), call self.final_save() to save the data
         self.final_save()
-        self.hdf5_file.close()
         for renderer, _ in self.camera_renderers.values():
             renderer.close()
 
