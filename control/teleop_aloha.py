@@ -131,7 +131,7 @@ class AlohaMocapControl:
         return img
 
     def final_save(self):
-        episode_idx = 0
+        episode_idx = 20 # @anyone collecting data: increment by one every time you want to create a new data sequence (episode_(n + 1))
 
         # straight from Tony Zhao ACT record_sim_episodes.py
         # HDF5
@@ -142,44 +142,19 @@ class AlohaMocapControl:
             obs = root.create_group('observations')
             image = obs.create_group('images')
 
-            right_w_len = 0
-            left_w_len = 0
-            overhead_len = 0
-            teleop_len = 0
-
-            for name, array in self.data_dict.items():
-                if "observations" in name:
-                    if "left" in name:
-                        left_w_len = len(array)
-                    elif "right" in name:
-                        right_w_len = len(array)
-                    elif "overhead" in name:
-                        overhead_len = len(array)
-                    elif "teleop" in name:
-                        teleop_len = len(array)
-
             for cam_name in self.camera_names:
-                if cam_name == 'wrist_cam_left':
-                    cam_len = left_w_len
-                elif cam_name == 'wrist_cam_right':
-                    cam_len = right_w_len
-                elif cam_name == 'overhead_cam':
-                    cam_len = overhead_len
-                elif cam_name == 'teleoperator_pov':
-                    cam_len = teleop_len
-                
-                _ = image.create_dataset(cam_name, (cam_len, 480, 640, 3), dtype='uint8',
+                _ = image.create_dataset(cam_name, (self.num_timesteps, 480, 640, 3), dtype='uint8',
                                          chunks=(1, 480, 640, 3), )
             # compression='gzip',compression_opts=2,)
             # compression=32001, compression_opts=(0, 0, 0, 0, 9, 1, 1), shuffle=False)
-            qpos = obs.create_dataset('qpos', (self.num_timesteps + 1, 14))
-            qvel = obs.create_dataset('qvel', (self.num_timesteps + 1, 14))
-            action = root.create_dataset('action', (self.num_timesteps + 1, 14))
+            qpos = obs.create_dataset('qpos', (self.num_timesteps, 14))
+            qvel = obs.create_dataset('qvel', (self.num_timesteps, 14))
+            action = root.create_dataset('action', (self.num_timesteps, 14))
 
             for name, array in self.data_dict.items():
                 print(f"shape of {name}: {np.array(array).shape}")
                 print(f"root[name]: {root[name]}")
-                root[name][...] = array
+                root[name][...] = array[0:self.num_timesteps + 1]
 
         print(f'Saving: {time.time() - t0:.1f} secs\n')
 
@@ -401,7 +376,9 @@ class AlohaMocapControl:
 
                 # data recording should be 50hz, 
                 # loop is currently 200hz, thus record every 4th loop
-                data_recording_interval = 4
+
+                #changing to 5hz since data collection makes the sim too slow
+                data_recording_interval = 40
                 iters = 0
                 while viewer.is_running():
                     self.joycon_control_l()
@@ -459,6 +436,10 @@ class AlohaMocapControl:
 
                         viewer.sync()
                         sim_rate.sleep()
+
+                    if self.num_timesteps == 100:
+                        sim_rate.sleep()
+                        break
                     
         except KeyboardInterrupt:
             pass
