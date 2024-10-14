@@ -99,21 +99,15 @@ class AlohaMocapControl:
 
         self.left_dof_ids = np.array([model.joint(name).id for name in self.left_joint_names])
         self.left_actuator_ids = np.array([model.actuator(name).id for name in self.left_joint_names])
-        left_relevant_qpos_indices = np.array([model.jnt_qposadr[model.joint(name).id] for name in self.left_joint_names])
-        left_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in self.left_joint_names])
-        self.left_configuration = ReducedConfiguration(model, data, left_relevant_qpos_indices, left_relevant_qvel_indices)
-
-        self.lstore = left_relevant_qpos_indices
-        self.lvelstore = left_relevant_qvel_indices
+        self.left_relevant_qpos_indices = np.array([model.jnt_qposadr[model.joint(name).id] for name in self.left_joint_names])
+        self.left_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in self.left_joint_names])
+        self.left_configuration = ReducedConfiguration(model, data, self.left_relevant_qpos_indices, self.left_relevant_qvel_indices)
 
         self.right_dof_ids = np.array([model.joint(name).id for name in self.right_joint_names])
         self.right_actuator_ids = np.array([model.actuator(name).id for name in self.right_joint_names])
-        right_relevant_qpos_indices = np.array([model.jnt_qposadr[model.joint(name).id] for name in self.right_joint_names])
-        right_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in self.right_joint_names])
-        self.right_configuration = ReducedConfiguration(model, data, right_relevant_qpos_indices, right_relevant_qvel_indices)
-
-        self.rstore = right_relevant_qpos_indices
-        self.rvelstore = right_relevant_qvel_indices
+        self.right_relevant_qpos_indices = np.array([model.jnt_qposadr[model.joint(name).id] for name in self.right_joint_names])
+        self.right_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in self.right_joint_names])
+        self.right_configuration = ReducedConfiguration(model, data, self.right_relevant_qpos_indices, self.right_relevant_qvel_indices)
 
     def initialize_hdf5_storage(self):
         # each time this file is run the name of the dataset should be the next number compared with the highest episode number already in the dataset directory
@@ -145,9 +139,10 @@ class AlohaMocapControl:
 
     def get_qpos(self):
         model = self.model
-        self.lstore = np.array([model.jnt_qposadr[model.joint(name).id] for name in self.left_joint_names])
-        self.rstore = np.array([model.jnt_qposadr[model.joint(name).id] for name in self.right_joint_names])
-        qpos = np.concatenate((self.lstore, [self.left_gripper_pos], self.rstore, [self.right_gripper_pos]), axis=0)
+        self.l_qpos = self.data.qpos[self.left_relevant_qpos_indices]
+        self.r_qpos = self.data.qpos[self.right_relevant_qpos_indices]
+
+        qpos = np.concatenate((self.l_qpos, [self.left_gripper_pos], self.r_qpos, [self.right_gripper_pos]), axis=0)
         return qpos
         
     def get_qvel(self):
@@ -155,9 +150,10 @@ class AlohaMocapControl:
         right_gripper_vel = 1 if self.action[13] > 0 else -1 if self.action[13] < 0 else 0
 
         model = self.model
-        self.rvelstore = np.array([model.jnt_dofadr[model.joint(name).id] for name in self.right_joint_names])
-        self.lvelstore = np.array([model.jnt_dofadr[model.joint(name).id] for name in self.left_joint_names])
-        qvel = np.concatenate((self.lvelstore, [left_gripper_vel], self.rvelstore, [right_gripper_vel]), axis=0)
+        self.l_qvel = self.data.qvel[self.left_relevant_qvel_indices]
+        self.r_qvel = self.data.qvel[self.right_relevant_qvel_indices]
+
+        qvel = np.concatenate((self.l_qvel, [left_gripper_vel], self.r_qvel, [right_gripper_vel]), axis=0)
         return qvel
     
     def get_action(self):
@@ -170,7 +166,7 @@ class AlohaMocapControl:
         return img
 
     def final_save(self):
-        episode_idx = 20 # @anyone collecting data: increment by one every time you want to create a new data sequence (episode_(n + 1))
+        episode_idx = 15 # @anyone collecting data: increment by one every time you want to create a new data sequence (episode_(n + 1))
 
         # straight from Tony Zhao ACT record_sim_episodes.py
         # HDF5
@@ -454,6 +450,11 @@ class AlohaMocapControl:
         except KeyboardInterrupt:
             pass
         finally:
+            # #print small subset of image data
+            # print(f"shape of wrist_cam_left: {np.array(self.data_dict['/observations/images/wrist_cam_left']).shape}")
+            # print(self.data_dict['/observations/images/wrist_cam_left'][0] - self.data_dict['/observations/images/wrist_cam_left'][-1])
+            # print(f"sum: {np.sum(self.data_dict['/observations/images/wrist_cam_left'][0] - self.data_dict['/observations/images/wrist_cam_left'][-1])}")
+            
             self.close()
 
     def close(self):
