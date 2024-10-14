@@ -82,6 +82,39 @@ class AlohaMocapControl:
 
         self.action = np.zeros(14)
 
+        self.left_joint_names = []
+        self.right_joint_names = []
+        self.velocity_limits = {}
+
+        for n in _JOINT_NAMES:
+            name_left = f"aloha_scene/left_{n}"
+            name_right = f"aloha_scene/right_{n}"
+            self.left_joint_names.append(name_left)
+            self.right_joint_names.append(name_right)
+            self.velocity_limits[name_left] = _VELOCITY_LIMITS[n]
+            self.velocity_limits[name_right] = _VELOCITY_LIMITS[n]
+
+        model = self.model
+        data = self.data
+
+        self.left_dof_ids = np.array([model.joint(name).id for name in self.left_joint_names])
+        self.left_actuator_ids = np.array([model.actuator(name).id for name in self.left_joint_names])
+        left_relevant_qpos_indices = np.array([model.jnt_qposadr[model.joint(name).id] for name in self.left_joint_names])
+        left_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in self.left_joint_names])
+        self.left_configuration = ReducedConfiguration(model, data, left_relevant_qpos_indices, left_relevant_qvel_indices)
+
+        self.lstore = left_relevant_qpos_indices
+        self.lvelstore = left_relevant_qvel_indices
+
+        self.right_dof_ids = np.array([model.joint(name).id for name in self.right_joint_names])
+        self.right_actuator_ids = np.array([model.actuator(name).id for name in self.right_joint_names])
+        right_relevant_qpos_indices = np.array([model.jnt_qposadr[model.joint(name).id] for name in self.right_joint_names])
+        right_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in self.right_joint_names])
+        self.right_configuration = ReducedConfiguration(model, data, right_relevant_qpos_indices, right_relevant_qvel_indices)
+
+        self.rstore = right_relevant_qpos_indices
+        self.rvelstore = right_relevant_qvel_indices
+
     def initialize_hdf5_storage(self):
         # each time this file is run the name of the dataset should be the next number compared with the highest episode number already in the dataset directory
         # stop collecting data and save the data when ctrl c called
@@ -111,13 +144,19 @@ class AlohaMocapControl:
         self.num_timesteps += 1
 
     def get_qpos(self):
+        model = self.model
+        self.lstore = np.array([model.jnt_qposadr[model.joint(name).id] for name in self.left_joint_names])
+        self.rstore = np.array([model.jnt_qposadr[model.joint(name).id] for name in self.right_joint_names])
         qpos = np.concatenate((self.lstore, [self.left_gripper_pos], self.rstore, [self.right_gripper_pos]), axis=0)
-        # print(f"len qpos: {len(qpos)}")
         return qpos
         
     def get_qvel(self):
         left_gripper_vel = 1 if self.action[6] > 0 else -1 if self.action[6] < 0 else 0
         right_gripper_vel = 1 if self.action[13] > 0 else -1 if self.action[13] < 0 else 0
+
+        model = self.model
+        self.rvelstore = np.array([model.jnt_dofadr[model.joint(name).id] for name in self.right_joint_names])
+        self.lvelstore = np.array([model.jnt_dofadr[model.joint(name).id] for name in self.left_joint_names])
         qvel = np.concatenate((self.lvelstore, [left_gripper_vel], self.rvelstore, [right_gripper_vel]), axis=0)
         return qvel
     
@@ -297,35 +336,6 @@ class AlohaMocapControl:
         model = self.model
         data = self.data
 
-        left_joint_names = []
-        right_joint_names = []
-        velocity_limits = {}
-
-        for n in _JOINT_NAMES:
-            name_left = f"aloha_scene/left_{n}"
-            name_right = f"aloha_scene/right_{n}"
-            left_joint_names.append(name_left)
-            right_joint_names.append(name_right)
-            velocity_limits[name_left] = _VELOCITY_LIMITS[n]
-            velocity_limits[name_right] = _VELOCITY_LIMITS[n]
-
-        left_dof_ids = np.array([model.joint(name).id for name in left_joint_names])
-        left_actuator_ids = np.array([model.actuator(name).id for name in left_joint_names])
-        left_relevant_qpos_indices = np.array([model.jnt_qposadr[model.joint(name).id] for name in left_joint_names])
-        left_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in left_joint_names])
-        left_configuration = ReducedConfiguration(model, data, left_relevant_qpos_indices, left_relevant_qvel_indices)
-
-        self.lstore = left_relevant_qpos_indices
-        self.lvelstore = left_relevant_qvel_indices
-
-        right_dof_ids = np.array([model.joint(name).id for name in right_joint_names])
-        right_actuator_ids = np.array([model.actuator(name).id for name in right_joint_names])
-        right_relevant_qpos_indices = np.array([model.jnt_qposadr[model.joint(name).id] for name in right_joint_names])
-        right_relevant_qvel_indices = np.array([model.jnt_dofadr[model.joint(name).id] for name in right_joint_names])
-        right_configuration = ReducedConfiguration(model, data, right_relevant_qpos_indices, right_relevant_qvel_indices)
-        self.rstore = right_relevant_qpos_indices
-        self.rvelstore = right_relevant_qvel_indices
-
         l_ee_task = mink.FrameTask(
                 frame_name="aloha_scene/left_gripper",
                 frame_type="site",
@@ -350,7 +360,7 @@ class AlohaMocapControl:
         )
 
         limits = [
-            mink.VelocityLimit(model, velocity_limits),
+            mink.VelocityLimit(model, self.velocity_limits),
             collision_avoidance_limit,
         ]
 
@@ -396,7 +406,7 @@ class AlohaMocapControl:
 
                     for _ in range(max_iters):
                         left_vel = mink.solve_ik(
-                            left_configuration,
+                            self.left_configuration,
                             [l_ee_task],
                             sim_rate.dt,
                             solver,
@@ -405,7 +415,7 @@ class AlohaMocapControl:
                         )
 
                         right_vel = mink.solve_ik(
-                            right_configuration,
+                            self.right_configuration,
                             [r_ee_task],
                             sim_rate.dt,
                             solver,
@@ -413,17 +423,17 @@ class AlohaMocapControl:
                             damping=1e-1,
                         )
 
-                        left_configuration.integrate_inplace(left_vel, sim_rate.dt)
-                        right_configuration.integrate_inplace(right_vel, sim_rate.dt)
+                        self.left_configuration.integrate_inplace(left_vel, sim_rate.dt)
+                        self.right_configuration.integrate_inplace(right_vel, sim_rate.dt)
 
-                        data.qpos[left_relevant_qpos_indices] = left_configuration.q
-                        data.qpos[right_relevant_qpos_indices] = right_configuration.q
+                        data.qpos[self.left_relevant_qpos_indices] = self.left_configuration.q
+                        data.qpos[self.right_relevant_qpos_indices] = self.right_configuration.q
 
-                        data.qvel[left_relevant_qvel_indices] = left_configuration.dq
-                        data.qvel[right_relevant_qvel_indices] = right_configuration.dq
+                        data.qvel[self.left_relevant_qvel_indices] = self.left_configuration.dq
+                        data.qvel[self.right_relevant_qvel_indices] = self.right_configuration.dq
 
-                        data.ctrl[left_actuator_ids] = left_configuration.q
-                        data.ctrl[right_actuator_ids] = right_configuration.q
+                        data.ctrl[self.left_actuator_ids] = self.left_configuration.q
+                        data.ctrl[self.right_actuator_ids] = self.right_configuration.q
 
                         self.control_gripper(self.left_gripper_pos, self.right_gripper_pos)
 
