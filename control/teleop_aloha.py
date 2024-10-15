@@ -138,7 +138,6 @@ class AlohaMocapControl:
         self.num_timesteps += 1
 
     def get_qpos(self):
-        model = self.model
         self.l_qpos = self.data.qpos[self.left_relevant_qpos_indices]
         self.r_qpos = self.data.qpos[self.right_relevant_qpos_indices]
 
@@ -149,7 +148,6 @@ class AlohaMocapControl:
         left_gripper_vel = 1 if self.action[6] > 0 else -1 if self.action[6] < 0 else 0
         right_gripper_vel = 1 if self.action[13] > 0 else -1 if self.action[13] < 0 else 0
 
-        model = self.model
         self.l_qvel = self.data.qvel[self.left_relevant_qvel_indices]
         self.r_qvel = self.data.qvel[self.right_relevant_qvel_indices]
 
@@ -166,7 +164,7 @@ class AlohaMocapControl:
         return img
 
     def final_save(self):
-        episode_idx = 15 # @anyone collecting data: increment by one every time you want to create a new data sequence (episode_(n + 1))
+        episode_idx = 16 # @anyone collecting data: increment by one every time you want to create a new data sequence (episode_(n + 1))
 
         # straight from Tony Zhao ACT record_sim_episodes.py
         # HDF5
@@ -380,10 +378,10 @@ class AlohaMocapControl:
 
                 sim_rate = RateLimiter(frequency=200.0) 
 
-                # data recording should be 50hz, 
+                # original plan: data recording should be 50hz, 
                 # loop is currently 200hz, thus record every 4th loop
 
-                #changing to 5hz since data collection makes the sim too slow
+                # changing to 5hz since data collection makes the sim too slow
                 data_recording_interval = 40
                 iters = 0
                 while viewer.is_running():
