@@ -33,5 +33,9 @@ pip-delete-this-directory.txt
 # Python
 .venv
 
-*data/
-*data_first/
+data/
+data_first/
+data_second/
+
+data.zip
+data_second.zip
