@@ -34,7 +34,7 @@ core_requirements = [
     "pyquaternion",
     "mujoco_utils",
     "wget",
-    "mojo @ git+https://git@github.com/stepjam/mojo.git@dev",
+    "mojo @ git+https://git@github.com/stepjam/mojo.git",
     "pyyaml",
     "dearpygui",
     "pyopenxr",
